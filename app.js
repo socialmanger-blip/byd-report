@@ -948,7 +948,10 @@ function renderMediaFolders(){
   $('mediaFolderTree').innerHTML = folders.map(folder => `
     <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''}">
       <button onclick="selectMediaFolder('${escapeJs(folder)}')">${folder === 'all' ? 'Tất cả thư mục' : escapeHtml(folder)}</button>
-      ${folder === 'all' ? '' : `<button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>`}
+      ${folder === 'all' ? '' : `
+        <button class="folder-edit" title="Đổi tên thư mục" onclick="renameMediaFolder('${escapeJs(folder)}')">✎</button>
+        <button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>
+      `}
     </div>
   `).join('');
 }
@@ -1055,6 +1058,24 @@ function createMediaFolder(){
   if(!folder) return;
   if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
   currentMediaFolder = folder;
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function renameMediaFolder(folder){
+  const name = prompt('Tên thư mục mới', folder);
+  if(!name) return;
+  const nextFolder = name.trim();
+  if(!nextFolder || nextFolder === folder) return;
+  if(mediaLibrary.folders.includes(nextFolder)){
+    alert('Thư mục này đã tồn tại');
+    return;
+  }
+  mediaLibrary.folders = mediaLibrary.folders.map(item => item === folder ? nextFolder : item);
+  mediaLibrary.files.forEach(file => {
+    if(file.folder === folder) file.folder = nextFolder;
+  });
+  if(currentMediaFolder === folder) currentMediaFolder = nextFolder;
   saveMediaLibrary();
   renderMediaLibrary();
 }
