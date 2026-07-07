@@ -22,7 +22,7 @@
       <button class="nav" data-platform="Google Maps">Google Maps</button>
       <div class="nav-title">Showroom</div>
       <button class="showroom-nav active" data-showroom="all">Tất cả showroom</button>
-      <button class="showroom-nav" data-showroom="HO">HO</button>
+      <button class="showroom-nav" data-showroom="HO">Trụ sở chính</button>
       <button class="showroom-nav" data-showroom="Phú Quốc">Phú Quốc</button>
       <button class="showroom-nav" data-showroom="Cần Thơ">Cần Thơ</button>
       <button class="showroom-nav" data-showroom="Kiên Giang">Kiên Giang</button>
@@ -34,16 +34,16 @@
     <main class="main">
       <header class="topbar">
         <div>
-          <h2>Quản lý mạng xã hội</h2>
+          <h2>Social Hub BYD NEG</h2>
           <div id="connectionStatus" class="status-ok">Đang kết nối Supabase...</div>
         </div>
-        <div class="top-actions">
+        <div class="top-actions post-content">
           <button id="btnOpenExport">Xuất Excel</button>
           <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
         </div>
       </header>
 
-      <section class="report-head">
+      <section class="report-head post-content">
         <div>
           <h3>Thống kê nội dung</h3>
           <p>Theo tháng, theo tuần, theo nền tảng và showroom/page.</p>
@@ -54,14 +54,14 @@
         </div>
       </section>
 
-      <section class="cards report-cards">
+      <section class="cards report-cards post-content">
         <div class="card"><b id="totalCount">0</b><span>Tổng bài trong tháng</span></div>
         <div class="card"><b id="pendingCount">0</b><span>Chờ duyệt</span></div>
         <div class="card"><b id="doneCount">0</b><span>Đã đăng</span></div>
         <div class="card"><b id="ideaCount">0</b><span>Ý tưởng</span></div>
       </section>
 
-      <section class="report-grid">
+      <section class="report-grid post-content">
         <div class="report-panel">
           <h4>Theo tuần trong tháng</h4>
           <div id="weekStats" class="week-stats"></div>
@@ -76,8 +76,49 @@
         </div>
       </section>
 
-      <section class="toolbar">
+      <section class="showroom-dashboard post-content" id="showroomDashboard">
+        <div class="section-title">
+          <div>
+            <h3 id="showroomDashboardTitle">Dashboard showroom</h3>
+          <p>Workspace làm việc: thêm bài, upload media, cập nhật KPI và theo dõi lịch nội dung.</p>
+          </div>
+        </div>
+        <div class="showroom-channel-grid" id="showroomChannelGrid"></div>
+      </section>
+
+      <section class="google-showrooms" id="googleShowrooms">
+        <div class="section-title">
+          <div>
+            <h3>SHOWROOM BYD KHU VỰC MEKONG</h3>
+            <p>Báo cáo lượt đánh giá, mục tiêu và hình ảnh Google Maps của từng showroom.</p>
+          </div>
+          <button type="button" class="detail-link" id="btnResetGoogleReport">Đặt lại</button>
+        </div>
+        <div class="google-summary">
+          <div class="google-summary-card"><b id="googleTotalReviews">0</b><span>Tổng đánh giá</span></div>
+          <div class="google-summary-card"><b id="googleTotalTarget">0</b><span>Target đánh giá</span></div>
+          <div class="google-summary-card"><b id="googleProgress">0%</b><span>Tiến độ</span></div>
+          <div class="google-summary-card"><b id="googleRemaining">0</b><span>Còn thiếu</span></div>
+        </div>
+        <div class="google-grid" id="googleShowroomGrid"></div>
+      </section>
+
+      <section class="channel-accounts" id="channelAccounts">
+        <div class="section-title">
+          <div>
+            <h3 id="channelAccountTitle">Account</h3>
+            <p>Tab nền tảng là khu vực báo cáo: xem KPI, tra cứu account và xuất dữ liệu.</p>
+          </div>
+        </div>
+        <div class="account-grid" id="channelAccountGrid"></div>
+      </section>
+
+      <section class="toolbar post-content">
         <input id="searchInput" placeholder="Tìm bài đăng..." />
+        <input id="ownerFilter" placeholder="Người phụ trách" />
+        <select id="yearFilter">
+          <option value="all">Tất cả năm</option>
+        </select>
         <select id="statusFilter">
           <option value="all">Tất cả trạng thái</option>
           <option value="Ý tưởng">Ý tưởng</option>
@@ -85,10 +126,16 @@
           <option value="Chờ duyệt">Chờ duyệt</option>
           <option value="Đã đăng">Đã đăng</option>
         </select>
+        <select id="sortFilter">
+          <option value="date-asc">01 → cuối tháng</option>
+          <option value="newest">Mới nhất</option>
+          <option value="oldest">Cũ nhất</option>
+          <option value="platform">Theo nền tảng</option>
+        </select>
         <button id="btnReload">Tải lại</button>
       </section>
 
-      <div class="table-wrap">
+      <div class="table-wrap post-content">
         <table>
           <thead>
             <tr>
@@ -98,12 +145,13 @@
               <th>Tiêu đề</th>
               <th>Ngày đăng</th>
               <th>Trạng thái</th>
+              <th>Người phụ trách</th>
               <th>Ghi chú</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody id="postTable">
-            <tr><td colspan="8" class="empty">Đang tải dữ liệu...</td></tr>
+            <tr><td colspan="9" class="empty">Đang tải dữ liệu...</td></tr>
           </tbody>
         </table>
       </div>
@@ -128,7 +176,7 @@
 
       <label>Showroom / Page sử dụng</label>
       <div class="showroom-checks">
-        <label><input type="checkbox" name="showroomCheck" value="HO" checked> HO</label>
+        <label><input type="checkbox" name="showroomCheck" value="HO" checked> Trụ sở chính</label>
         <label><input type="checkbox" name="showroomCheck" value="Phú Quốc"> Phú Quốc</label>
         <label><input type="checkbox" name="showroomCheck" value="Cần Thơ"> Cần Thơ</label>
         <label><input type="checkbox" name="showroomCheck" value="Kiên Giang"> Kiên Giang</label>
@@ -142,6 +190,9 @@
       <label>Ngày đăng</label>
       <input id="postDate" type="date" />
 
+      <label>Giờ đăng</label>
+      <input id="postTime" type="time" />
+
       <label>Trạng thái</label>
       <select id="postStatus">
         <option>Ý tưởng</option>
@@ -150,11 +201,27 @@
         <option>Đã đăng</option>
       </select>
 
-      <label>Ghi chú / Caption</label>
-      <textarea id="note" placeholder="Caption, link Canva, link Drive, yêu cầu chỉnh sửa..."></textarea>
+      <label>Link bài đã đăng</label>
+      <input id="postLink" placeholder="https://..." />
 
-      <label>Ảnh bài đăng</label>
-      <input id="imageInput" type="file" accept="image/*" multiple />
+      <label>Người phụ trách</label>
+      <input id="owner" placeholder="Tên nhân sự phụ trách" />
+
+      <label>Hashtag</label>
+      <input id="hashtags" placeholder="#BYD #BYDNEG" />
+
+      <label>Caption</label>
+      <textarea id="note" placeholder="Caption hiển thị trên kênh..."></textarea>
+
+      <label>Nội dung chi tiết</label>
+      <textarea id="content" placeholder="Nội dung, brief, kịch bản video, ghi chú sản xuất..."></textarea>
+
+      <label>Media bài đăng</label>
+      <input id="imageInput" type="file" accept="image/*,video/*,.pdf" multiple />
+      <small class="field-hint">Có thể upload nhiều ảnh, video, PDF. Ảnh đầu tiên sẽ dùng làm ảnh đại diện trong bảng.</small>
+
+      <label>Thumbnail</label>
+      <input id="thumbnailInput" type="file" accept="image/*" />
       <div id="previewWrap" class="preview-wrap"></div>
 
       <div class="modal-actions">

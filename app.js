@@ -3,6 +3,70 @@ let currentPlatform = 'all';
 let currentShowroom = 'all';
 let editingId = null;
 let editingImageUrls = [];
+let editingMediaUrls = [];
+let editingThumbnailUrl = '';
+
+const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
+const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
+const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
+const reportShowroomNames = ['Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
+const showroomNames = ['HO', ...reportShowroomNames];
+const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
+const defaultGoogleMapShowrooms = [
+  {
+    type: '4S',
+    brand: 'BYD NEG',
+    name: 'Showroom 4S BYD NEG TIỀN GIANG',
+    reviews: 0,
+    target: 100,
+    address: '602 Quốc lộ 1, Khu Phố Phước Hòa, Phường Trung An, Tỉnh Đồng Tháp.',
+    image: '',
+    mapLink: ''
+  },
+  {
+    type: '1S',
+    brand: 'BYD NEG',
+    name: 'Showroom 1S BYD NEG KIÊN GIANG',
+    reviews: 0,
+    target: 100,
+    address: 'Lô P3-01, Đường 3 Tháng 2, Phường Rạch Giá, Tỉnh An Giang.',
+    image: '',
+    mapLink: ''
+  },
+  {
+    type: '4S',
+    brand: 'BYD NEG',
+    name: 'Showroom 4S BYD NEG PHÚ QUỐC',
+    reviews: 0,
+    target: 100,
+    address: 'Tổ 7, Khu phố Suối Đá Dương Tơ, Đặc khu Phú Quốc, Tỉnh An Giang.',
+    image: '',
+    mapLink: ''
+  },
+  {
+    type: '4S',
+    brand: 'BYD NEG',
+    name: 'Showroom 4S BYD NEG CẦN THƠ',
+    reviews: 0,
+    target: 100,
+    address: '384 Võ Nguyên Giáp, Phường Hưng Phú, Thành Phố Cần Thơ.',
+    image: '',
+    mapLink: ''
+  },
+  {
+    type: '1S',
+    brand: 'BYD NEG',
+    name: 'Showroom 1S BYD NEG AN GIANG',
+    reviews: 0,
+    target: 100,
+    address: '43/12 Trần Hưng Đạo, Phường Mỹ Thới, Tỉnh An Giang.',
+    image: '',
+    mapLink: ''
+  }
+];
+let googleMapShowrooms = loadGoogleMapShowrooms();
+let channelAccounts = loadChannelAccounts();
+let monthlyKpis = loadMonthlyKpis();
 
 const defaultExportFields = [
   { key:'stt', label:'STT', checked:true },
@@ -10,10 +74,15 @@ const defaultExportFields = [
   { key:'showroom', label:'Showroom/Page', checked:true },
   { key:'title', label:'Tiêu đề', checked:true },
   { key:'post_date', label:'Ngày đăng', checked:true },
+  { key:'post_time', label:'Giờ đăng', checked:false },
   { key:'week', label:'Tuần trong tháng', checked:true },
   { key:'status', label:'Trạng thái', checked:true },
-  { key:'note', label:'Ghi chú/Caption', checked:true },
+  { key:'owner', label:'Người phụ trách', checked:true },
+  { key:'post_link', label:'Link bài', checked:true },
+  { key:'hashtags', label:'Hashtag', checked:false },
+  { key:'note', label:'Caption', checked:true },
   { key:'image_urls', label:'Ảnh', checked:true },
+  { key:'media_urls', label:'Media', checked:false },
   { key:'created_at', label:'Ngày tạo', checked:false }
 ];
 let exportFields = JSON.parse(JSON.stringify(defaultExportFields));
@@ -23,6 +92,8 @@ const $ = (id) => document.getElementById(id);
 window.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   setDefaultMonth();
+  renderGoogleMapShowrooms();
+  renderChannelAccounts();
   loadPosts();
 });
 
@@ -37,19 +108,26 @@ function bindEvents(){
   $('btnCancelExport').addEventListener('click', closeExportModal);
   $('btnExportExcel').addEventListener('click', exportExcel);
   $('btnResetExportFields').addEventListener('click', resetExportFields);
+  $('btnResetGoogleReport').addEventListener('click', resetGoogleMapReport);
   $('searchInput').addEventListener('input', renderPosts);
+  $('ownerFilter').addEventListener('input', renderPosts);
   $('statusFilter').addEventListener('change', renderPosts);
+  $('yearFilter').addEventListener('change', renderPosts);
+  $('sortFilter').addEventListener('change', renderPosts);
   $('monthFilter').addEventListener('change', renderPosts);
   $('btnCloseImage').addEventListener('click', closeImage);
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
   $('imageInput').addEventListener('change', previewImages);
+  $('thumbnailInput').addEventListener('change', previewImages);
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.nav').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
+      setActiveShowroomNav('all');
       currentPlatform = btn.dataset.platform;
+      currentShowroom = 'all';
       renderPosts();
     });
   });
@@ -57,9 +135,23 @@ function bindEvents(){
     btn.addEventListener('click', () => {
       document.querySelectorAll('.showroom-nav').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
+      setActivePlatformNav('all');
       currentShowroom = btn.dataset.showroom;
+      currentPlatform = 'all';
       renderPosts();
     });
+  });
+}
+
+function setActivePlatformNav(platform){
+  document.querySelectorAll('.nav').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.platform === platform);
+  });
+}
+
+function setActiveShowroomNav(showroom){
+  document.querySelectorAll('.showroom-nav').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.showroom === showroom);
   });
 }
 
@@ -73,12 +165,20 @@ async function loadPosts(){
   if(error){
     console.error(error);
     setStatus('Lỗi kết nối Supabase: ' + error.message, false);
-    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
+    $('postTable').innerHTML = `<tr><td colspan="9" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
   posts = data || [];
+  updateYearFilter();
   setStatus('Đã kết nối Supabase. Dữ liệu đang lưu online.', true);
   renderPosts();
+}
+
+function updateYearFilter(){
+  const selected = $('yearFilter').value || 'all';
+  const years = [...new Set(posts.map(p => String(p.post_date || '').slice(0,4)).filter(Boolean))].sort().reverse();
+  $('yearFilter').innerHTML = '<option value="all">Tất cả năm</option>' + years.map(year => `<option value="${year}">${year}</option>`).join('');
+  $('yearFilter').value = years.includes(selected) ? selected : 'all';
 }
 
 function csvList(value){
@@ -99,38 +199,69 @@ function showroomMatches(value, showroom){
   return showroomList(value).includes(showroom);
 }
 
+function showroomDisplayName(showroom){
+  return showroom === 'HO' ? 'BYD NEG Việt Nam' : showroom;
+}
+
 function getImageUrls(post){
   if(Array.isArray(post.image_urls) && post.image_urls.length) return post.image_urls.filter(Boolean);
   if(post.image_url) return [post.image_url];
   return [];
 }
 
+function getMediaUrls(post){
+  if(Array.isArray(post.media_urls) && post.media_urls.length) return post.media_urls.filter(Boolean);
+  return getImageUrls(post);
+}
+
+function isVideoUrl(url){
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(String(url || ''));
+}
+
 function renderImages(post){
   const urls = getImageUrls(post);
-  if(urls.length === 0) return '-';
+  if(urls.length === 0) return '<span class="muted">-</span>';
   return `<div class="thumb-list">${urls.map(url => `
-    <img class="thumb" src="${escapeHtml(url)}" onclick="showImage('${escapeJs(url)}')">
+    <img class="thumb" src="${escapeHtml(url)}" alt="Ảnh bài đăng" loading="lazy" onclick="showImage('${escapeJs(url)}')" onerror="this.outerHTML='<span class=&quot;thumb thumb-error&quot;>Ảnh lỗi</span>'">
   `).join('')}</div>`;
 }
 
 
 function getFilteredPosts(){
   const keyword = $('searchInput').value.toLowerCase().trim();
+  const owner = $('ownerFilter').value.toLowerCase().trim();
   const status = $('statusFilter').value;
-  return posts.filter(p => {
+  const year = $('yearFilter').value;
+  const sort = $('sortFilter').value;
+  const filtered = posts.filter(p => {
     const matchPlatform = platformMatches(p.platform, currentPlatform);
     const matchStatus = status === 'all' || p.status === status;
     const matchShowroom = showroomMatches(p.showroom, currentShowroom);
-    const text = `${p.title||''} ${p.note||''} ${p.showroom||''} ${p.platform||''}`.toLowerCase();
-    return matchPlatform && matchStatus && matchShowroom && text.includes(keyword);
+    const matchOwner = !owner || String(p.owner || '').toLowerCase().includes(owner);
+    const matchYear = year === 'all' || String(p.post_date || '').slice(0,4) === year;
+    const text = `${p.title||''} ${p.note||''} ${p.content||''} ${p.showroom||''} ${p.platform||''} ${p.owner||''} ${p.hashtags||''}`.toLowerCase();
+    return matchPlatform && matchStatus && matchShowroom && matchOwner && matchYear && text.includes(keyword);
   });
+  return sortPosts(filtered, sort);
+}
+
+function sortPosts(items, sort){
+  const copy = [...items];
+  if(sort === 'newest') return copy.sort((a,b)=>String(b.post_date||'').localeCompare(String(a.post_date||'')));
+  if(sort === 'oldest') return copy.sort((a,b)=>String(a.post_date||'').localeCompare(String(b.post_date||'')));
+  if(sort === 'platform') return copy.sort((a,b)=>String(a.platform||'').localeCompare(String(b.platform||''), 'vi'));
+  return copy.sort((a,b)=>String(a.post_date||'').localeCompare(String(b.post_date||'')));
 }
 
 function renderPosts(){
   const result = getFilteredPosts();
+  updateGoogleMapSection();
+  updateChannelAccountSection();
+  renderShowroomDashboard();
+  updateWorkspaceActions();
   updateStats();
   if(result.length === 0){
-    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Chưa có bài đăng nào</td></tr>`;
+    $('postTable').innerHTML = `<tr><td colspan="9" class="empty">Chưa có bài đăng nào</td></tr>`;
     return;
   }
   $('postTable').innerHTML = result.map(p => `
@@ -138,16 +269,489 @@ function renderPosts(){
       <td>${escapeHtml(p.platform || '-')}</td>
       <td>${escapeHtml(p.showroom || '-')}</td>
       <td>${renderImages(p)}</td>
-      <td><b>${escapeHtml(p.title || '-')}</b></td>
+      <td><b class="post-title">${escapeHtml(p.title || '-')}</b></td>
       <td>${formatDate(p.post_date)}</td>
-      <td>${escapeHtml(p.status || '-')}</td>
-      <td>${escapeHtml(p.note || '-')}</td>
-      <td>
-        <button class="action-btn" onclick="editPost(${p.id})">Sửa</button>
-        <button class="action-btn delete" onclick="deletePost(${p.id})">Xóa</button>
-      </td>
+      <td><span class="status-pill ${getStatusClass(p.status)}">${escapeHtml(p.status || '-')}</span></td>
+      <td>${escapeHtml(p.owner || '-')}</td>
+      <td><div class="note-cell" title="${escapeHtml(p.note || '')}">${escapeHtml(p.note || '-')}</div></td>
+      <td>${renderRowActions(p)}</td>
     </tr>
   `).join('');
+}
+
+function renderRowActions(post){
+  if(currentShowroom === 'all') return '<span class="muted">Chỉ xem</span>';
+  return `
+    <div class="action-group">
+      <button class="action-btn" onclick="editPost(${post.id})">Sửa</button>
+      <button class="action-btn delete" onclick="deletePost(${post.id})">Xóa</button>
+    </div>
+  `;
+}
+
+function updateWorkspaceActions(){
+  document.querySelectorAll('.top-actions').forEach(el => {
+    el.classList.toggle('is-hidden', currentShowroom === 'all' || currentPlatform === 'Google Maps');
+  });
+}
+
+function getStatusClass(status){
+  const map = {
+    'Ý tưởng': 'is-idea',
+    'Đang làm': 'is-doing',
+    'Chờ duyệt': 'is-pending',
+    'Đã đăng': 'is-done'
+  };
+  return map[status] || 'is-muted';
+}
+
+function updateGoogleMapSection(){
+  const section = $('googleShowrooms');
+  if(!section) return;
+  const isGoogleMap = currentPlatform === 'Google Maps' && currentShowroom === 'all';
+  section.classList.toggle('is-visible', isGoogleMap);
+  document.querySelectorAll('.post-content').forEach(el => {
+    if(el.classList.contains('top-actions')) return;
+    el.classList.toggle('is-hidden', isGoogleMap);
+  });
+}
+
+function updateChannelAccountSection(){
+  const section = $('channelAccounts');
+  if(!section) return;
+  const isAccountPlatform = currentPlatform !== 'all' && currentPlatform !== 'Google Maps' && currentShowroom === 'all';
+  section.classList.toggle('is-visible', isAccountPlatform);
+  if(isAccountPlatform) renderChannelAccounts();
+}
+
+function renderShowroomDashboard(){
+  const section = $('showroomDashboard');
+  const target = $('showroomChannelGrid');
+  if(!section || !target) return;
+  const isVisible = currentShowroom !== 'all';
+  section.classList.toggle('is-visible', isVisible);
+  if(!isVisible) return;
+
+  $('showroomDashboardTitle').innerText = `Dashboard ${showroomDisplayName(currentShowroom)}`;
+  const month = $('monthFilter').value;
+  const showroomPosts = posts.filter(post => {
+    const matchMonth = !month || getMonthKey(post.post_date) === month;
+    return matchMonth && showroomMatches(post.showroom, currentShowroom);
+  });
+  const dashboardChannels = currentShowroom === 'HO' ? [...showroomDashboardChannels, 'YouTube'] : showroomDashboardChannels;
+  const kpis = getShowroomKpis(currentShowroom, showroomPosts);
+  const modules = dashboardChannels.map(platform => {
+    const isActiveChannel = currentPlatform === platform;
+    const channelPosts = posts.filter(post => {
+      const matchMonth = !month || getMonthKey(post.post_date) === month;
+      return matchMonth && showroomMatches(post.showroom, currentShowroom) && platformMatches(post.platform, platform);
+    });
+    const done = channelPosts.filter(post => post.status === 'Đã đăng').length;
+    const pending = channelPosts.filter(post => post.status === 'Chờ duyệt').length;
+    const idea = channelPosts.filter(post => post.status === 'Ý tưởng').length;
+    const accountLink = getShowroomChannelLink(platform, currentShowroom);
+    const googleInfo = platform === 'Google Maps' ? getGoogleMapInfoForShowroom(currentShowroom) : null;
+    const monthlyKpi = getMonthlyKpi(currentShowroom, platform, month);
+    const mapLink = googleInfo ? (googleInfo.mapLink || '') : '';
+    const linkValue = platform === 'Google Maps' ? mapLink : accountLink;
+    const linkLabel = platform === 'Google Maps' ? 'Link Google Maps' : 'Link account';
+    const openLabel = platform === 'Google Maps' ? 'Mở map' : 'Mở account';
+    const extraMetric = googleInfo
+      ? `<div><b>${toNumber(googleInfo.reviews)}</b><span>Đánh giá</span></div>
+         <div><b>${toNumber(googleInfo.target)}</b><span>Target review</span></div>`
+      : `<div><b>${pending}</b><span>Chờ duyệt</span></div>
+         <div><b>${idea}</b><span>Ý tưởng</span></div>`;
+    return `
+      <article class="showroom-channel-card ${isActiveChannel ? 'is-current' : ''}">
+        <div class="channel-head">
+          <span class="channel-badge">${escapeHtml(platform)}</span>
+          <button type="button" class="mini-primary" data-create-platform="${escapeHtml(platform)}" data-create-showroom="${escapeHtml(currentShowroom)}">+ Tạo bài</button>
+        </div>
+        <div class="channel-metrics">
+          <div><b>${channelPosts.length}</b><span>Tổng bài</span></div>
+          <div><b>${done}</b><span>Đã đăng</span></div>
+          ${extraMetric}
+        </div>
+        <label>${linkLabel}
+          <input type="url" placeholder="Dán ${escapeHtml(linkLabel.toLowerCase())}" value="${escapeHtml(linkValue)}" data-dashboard-link-platform="${escapeHtml(platform)}" data-dashboard-link-showroom="${escapeHtml(currentShowroom)}">
+        </label>
+        <div class="kpi-input-grid">
+          <label>Reach<input type="number" min="0" value="${monthlyKpi.reach}" data-kpi-field="reach" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>Engagement<input type="number" min="0" value="${monthlyKpi.engagement}" data-kpi-field="engagement" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>Follow<input type="number" min="0" value="${monthlyKpi.follow}" data-kpi-field="follow" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>Like<input type="number" min="0" value="${monthlyKpi.like}" data-kpi-field="like" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+        </div>
+        <a class="open-link ${linkValue ? '' : 'is-disabled'}" href="${escapeHtml(linkValue || '#')}" target="_blank" rel="noopener">${openLabel}</a>
+      </article>
+    `;
+  }).join('');
+  target.innerHTML = `
+    <div class="workspace-kpi">
+      <div><b>${showroomPosts.length}</b><span>Tổng bài tháng</span></div>
+      <div><b>${kpis.video}</b><span>Tổng video</span></div>
+      <div><b>${kpis.reach}</b><span>Tổng Reach</span></div>
+      <div><b>${kpis.engagement}</b><span>Engagement</span></div>
+      <div><b>${kpis.follow}</b><span>Follow</span></div>
+      <div><b>${kpis.like}</b><span>Like</span></div>
+    </div>
+    <div class="workspace-layout">
+      <div>
+        <h4>Module kênh</h4>
+        <div class="showroom-module-grid">${modules}</div>
+      </div>
+      <div>
+        <h4>Hoạt động gần đây</h4>
+        <div class="activity-list">${renderRecentActivity(showroomPosts)}</div>
+        <h4>Lịch nội dung</h4>
+        <div class="calendar-mini">${renderContentCalendar(showroomPosts, month)}</div>
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll('[data-create-platform]').forEach(button => {
+    button.addEventListener('click', () => {
+      openModal({
+        platform: button.dataset.createPlatform,
+        showroom: button.dataset.createShowroom
+      });
+    });
+  });
+  document.querySelectorAll('[data-dashboard-link-platform]').forEach(input => {
+    input.addEventListener('change', handleShowroomDashboardLink);
+  });
+  document.querySelectorAll('[data-kpi-field]').forEach(input => {
+    input.addEventListener('change', handleMonthlyKpiInput);
+  });
+}
+
+function getMonthlyKpi(showroom, platform, month){
+  const key = `${month || 'all'}|${showroom}|${platform}`;
+  return monthlyKpis[key] || { reach:0, engagement:0, follow:0, like:0 };
+}
+
+function handleMonthlyKpiInput(event){
+  const month = $('monthFilter').value || 'all';
+  const showroom = event.target.dataset.kpiShowroom;
+  const platform = event.target.dataset.kpiPlatform;
+  const field = event.target.dataset.kpiField;
+  const key = `${month}|${showroom}|${platform}`;
+  monthlyKpis[key] = monthlyKpis[key] || { reach:0, engagement:0, follow:0, like:0 };
+  monthlyKpis[key][field] = Math.max(0, Number(event.target.value || 0));
+  saveMonthlyKpis();
+  renderShowroomDashboard();
+}
+
+function getShowroomKpis(showroom, showroomPosts){
+  const month = $('monthFilter').value || 'all';
+  const platforms = showroom === 'HO' ? [...showroomDashboardChannels, 'YouTube'] : showroomDashboardChannels;
+  const totals = platforms.reduce((acc, platform) => {
+    const kpi = getMonthlyKpi(showroom, platform, month);
+    acc.reach += toNumber(kpi.reach);
+    acc.engagement += toNumber(kpi.engagement);
+    acc.follow += toNumber(kpi.follow);
+    acc.like += toNumber(kpi.like);
+    return acc;
+  }, { reach:0, engagement:0, follow:0, like:0 });
+  const links = ['Facebook', 'TikTok', 'Zalo OA'].map(platform => getShowroomChannelLink(platform, showroom)).filter(Boolean).length;
+  const google = getGoogleMapInfoForShowroom(showroom);
+  return {
+    video: showroomPosts.filter(post => getMediaUrls(post).some(url => isVideoUrl(url))).length,
+    reach: totals.reach || '-',
+    engagement: totals.engagement || '-',
+    follow: totals.follow || (links ? `${links} kênh` : '-'),
+    like: totals.like || (google && google.reviews ? google.reviews : '-')
+  };
+}
+
+function renderRecentActivity(items){
+  const recent = [...items].sort((a,b)=>String(b.post_date||'').localeCompare(String(a.post_date||''))).slice(0,5);
+  if(!recent.length) return '<div class="empty-mini">Chưa có hoạt động</div>';
+  return recent.map(post => `
+    <div class="activity-item">
+      <b>${escapeHtml(post.title || '-')}</b>
+      <span>${escapeHtml(post.platform || '-')} · ${formatDate(post.post_date)}</span>
+    </div>
+  `).join('');
+}
+
+function renderContentCalendar(items, month){
+  const daysInMonth = month ? new Date(Number(month.slice(0,4)), Number(month.slice(5,7)), 0).getDate() : 31;
+  const postedDays = new Set(items.map(post => Number(String(post.post_date || '').slice(8,10))).filter(Boolean));
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    return `<span class="${postedDays.has(day) ? 'has-post' : ''}">${day}</span>`;
+  }).join('');
+}
+
+function getShowroomChannelLink(platform, showroom){
+  const accounts = channelAccounts[platform] || [];
+  const found = accounts.find(account => account.showroom === showroom);
+  return found ? found.link || '' : '';
+}
+
+function setShowroomChannelLink(platform, showroom, link){
+  if(!channelAccounts[platform]){
+    channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'' }));
+  }
+  let found = channelAccounts[platform].find(account => account.showroom === showroom);
+  if(!found){
+    found = { showroom, link:'' };
+    channelAccounts[platform].push(found);
+  }
+  found.link = link;
+  saveChannelAccounts();
+}
+
+function getGoogleMapInfoForShowroom(showroom){
+  return googleMapShowrooms.find(item => item.name.includes(showroom)) || {
+    reviews: 0,
+    target: 0,
+    mapLink: ''
+  };
+}
+
+function handleShowroomDashboardLink(event){
+  const platform = event.target.dataset.dashboardLinkPlatform;
+  const showroom = event.target.dataset.dashboardLinkShowroom;
+  const link = event.target.value.trim();
+  if(platform === 'Google Maps'){
+    const info = googleMapShowrooms.find(item => item.name.includes(showroom));
+    if(info){
+      info.mapLink = link;
+      saveGoogleMapShowrooms();
+    }
+  }else{
+    setShowroomChannelLink(platform, showroom, link);
+  }
+  renderShowroomDashboard();
+}
+
+function renderChannelAccounts(){
+  const section = $('channelAccounts');
+  const target = $('channelAccountGrid');
+  if(!section || !target) return;
+  const overviewShowrooms = currentPlatform === 'YouTube' ? ['HO'] : reportShowroomNames;
+  $('channelAccountTitle').innerText = currentPlatform === 'YouTube'
+    ? 'Tổng quan YouTube - BYD NEG Việt Nam'
+    : `Tổng quan ${currentPlatform} - 5 showroom`;
+  const month = $('monthFilter').value;
+  target.innerHTML = overviewShowrooms.map(showroom => {
+    const channelPosts = posts.filter(post => {
+      const matchMonth = !month || getMonthKey(post.post_date) === month;
+      return matchMonth && showroomMatches(post.showroom, showroom) && platformMatches(post.platform, currentPlatform);
+    });
+    const done = channelPosts.filter(post => post.status === 'Đã đăng').length;
+    const pending = channelPosts.filter(post => post.status === 'Chờ duyệt').length;
+    const idea = channelPosts.filter(post => post.status === 'Ý tưởng').length;
+    const link = getShowroomChannelLink(currentPlatform, showroom);
+    return `
+      <article class="account-card">
+        <div class="channel-head">
+          <div>
+            <span class="service-badge">${escapeHtml(showroom === 'HO' ? 'VN' : showroom.slice(0, 2).toUpperCase())}</span>
+            <h4>${escapeHtml(showroomDisplayName(showroom))}</h4>
+          </div>
+        </div>
+        <div class="channel-metrics">
+          <div><b>${channelPosts.length}</b><span>Tổng bài</span></div>
+          <div><b>${done}</b><span>Đã đăng</span></div>
+          <div><b>${pending}</b><span>Chờ duyệt</span></div>
+          <div><b>${idea}</b><span>Ý tưởng</span></div>
+        </div>
+        <div class="readonly-line"><span>Link account</span><b>${link ? 'Đã lưu' : 'Chưa có'}</b></div>
+        <a class="open-link ${link ? '' : 'is-disabled'}" href="${escapeHtml(link || '#')}" target="_blank" rel="noopener">Mở account</a>
+      </article>
+    `;
+  }).join('');
+}
+
+function getAccountsForCurrentPlatform(){
+  if(!channelAccounts[currentPlatform]){
+    channelAccounts[currentPlatform] = showroomNames.map(showroom => ({ showroom, link:'' }));
+  }
+  return channelAccounts[currentPlatform];
+}
+
+function handleAccountInput(event){
+  setShowroomChannelLink(currentPlatform, event.target.dataset.accountShowroom, event.target.value.trim());
+  renderChannelAccounts();
+}
+
+function renderGoogleMapShowrooms(){
+  const target = $('googleShowroomGrid');
+  if(!target) return;
+  updateGoogleSummary();
+  target.innerHTML = googleMapShowrooms.map((showroom, index) => {
+    const reviews = toNumber(showroom.reviews);
+    const reviewTarget = toNumber(showroom.target);
+    const progress = reviewTarget ? Math.min(100, Math.round(reviews / reviewTarget * 100)) : 0;
+    const remaining = Math.max(0, reviewTarget - reviews);
+    const mapLink = showroom.mapLink || '';
+    const image = showroom.image
+      ? `<img src="${escapeHtml(showroom.image)}" alt="${escapeHtml(showroom.name)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;google-photo-empty&quot;>Ảnh showroom</div>'">`
+      : '<div class="google-photo-empty">Ảnh showroom</div>';
+    return `
+      <article class="google-card">
+        <label class="google-photo" title="Bấm để upload ảnh showroom">
+          ${image}
+          <input type="file" accept="image/*" data-google-field="image" data-google-index="${index}">
+        </label>
+        <div class="google-body">
+          <div class="google-topline">
+            <span class="service-badge">${escapeHtml(showroom.type || '')}</span>
+          </div>
+          <h4>${escapeHtml(showroom.name)}</h4>
+          <div class="review-metrics">
+            <div><b>${reviews}</b><span>Đánh giá hiện tại</span></div>
+            <div><b>${reviewTarget}</b><span>Target</span></div>
+            <div><b>${remaining}</b><span>Còn thiếu</span></div>
+          </div>
+          <div class="progress-track"><i style="width:${progress}%"></i></div>
+          <div class="review-count">${progress}% target</div>
+          <p><span class="pin-icon">⌖</span>${escapeHtml(showroom.address)}</p>
+          <div class="google-edit">
+            <label>Số đánh giá
+              <input type="number" min="0" value="${reviews}" data-google-field="reviews" data-google-index="${index}">
+            </label>
+            <label>Target
+              <input type="number" min="0" value="${reviewTarget}" data-google-field="target" data-google-index="${index}">
+            </label>
+            <label>Link Google Maps
+              <input type="url" placeholder="Dán link Google Maps" value="${escapeHtml(mapLink)}" data-google-field="mapLink" data-google-index="${index}">
+            </label>
+            <a class="open-link ${mapLink ? '' : 'is-disabled'}" href="${escapeHtml(mapLink || '#')}" target="_blank" rel="noopener">Mở Google Maps</a>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+  bindGoogleMapInputs();
+  updateGoogleMapSection();
+}
+
+function bindGoogleMapInputs(){
+  document.querySelectorAll('[data-google-field]').forEach(input => {
+    input.addEventListener('change', handleGoogleMapInput);
+  });
+}
+
+async function handleGoogleMapInput(event){
+  const input = event.target;
+  const index = Number(input.dataset.googleIndex);
+  const field = input.dataset.googleField;
+  if(!googleMapShowrooms[index]) return;
+
+  if(field === 'image'){
+    const file = input.files && input.files[0];
+    if(!file) return;
+    input.disabled = true;
+    try{
+      googleMapShowrooms[index].image = await uploadShowroomImage(file, googleMapShowrooms[index].name);
+      saveGoogleMapShowrooms();
+      renderGoogleMapShowrooms();
+    }catch(err){
+      console.error(err);
+      alert('Lỗi upload ảnh showroom: ' + err.message);
+    }finally{
+      input.disabled = false;
+    }
+    return;
+  }
+
+  if(field === 'reviews' || field === 'target'){
+    googleMapShowrooms[index][field] = Math.max(0, Number(input.value || 0));
+  }else{
+    googleMapShowrooms[index][field] = input.value.trim();
+  }
+  saveGoogleMapShowrooms();
+  renderGoogleMapShowrooms();
+}
+
+function updateGoogleSummary(){
+  const totalReviews = googleMapShowrooms.reduce((sum, item) => sum + toNumber(item.reviews), 0);
+  const totalTarget = googleMapShowrooms.reduce((sum, item) => sum + toNumber(item.target), 0);
+  const progress = totalTarget ? Math.min(100, Math.round(totalReviews / totalTarget * 100)) : 0;
+  const remaining = Math.max(0, totalTarget - totalReviews);
+  $('googleTotalReviews').innerText = totalReviews;
+  $('googleTotalTarget').innerText = totalTarget;
+  $('googleProgress').innerText = `${progress}%`;
+  $('googleRemaining').innerText = remaining;
+}
+
+function resetGoogleMapReport(){
+  if(!confirm('Đặt lại báo cáo Google Maps về mặc định?')) return;
+  googleMapShowrooms = JSON.parse(JSON.stringify(defaultGoogleMapShowrooms));
+  saveGoogleMapShowrooms();
+  renderGoogleMapShowrooms();
+}
+
+function loadGoogleMapShowrooms(){
+  try{
+    const saved = localStorage.getItem(googleMapStorageKey);
+    if(saved) return JSON.parse(saved);
+  }catch(err){
+    console.warn('Không đọc được dữ liệu Google Maps đã lưu:', err);
+  }
+  return JSON.parse(JSON.stringify(defaultGoogleMapShowrooms));
+}
+
+function saveGoogleMapShowrooms(){
+  localStorage.setItem(googleMapStorageKey, JSON.stringify(googleMapShowrooms));
+}
+
+function loadChannelAccounts(){
+  try{
+    const saved = localStorage.getItem(channelAccountStorageKey);
+    if(saved) return JSON.parse(saved);
+  }catch(err){
+    console.warn('Không đọc được link account đã lưu:', err);
+  }
+  return {
+    Facebook: showroomNames.map(showroom => ({ showroom, link:'' })),
+    TikTok: showroomNames.map(showroom => ({ showroom, link:'' })),
+    'Zalo OA': showroomNames.map(showroom => ({ showroom, link:'' })),
+    YouTube: [{ showroom:'HO', link:'' }]
+  };
+}
+
+function saveChannelAccounts(){
+  localStorage.setItem(channelAccountStorageKey, JSON.stringify(channelAccounts));
+}
+
+function loadMonthlyKpis(){
+  try{
+    const saved = localStorage.getItem(monthlyKpiStorageKey);
+    if(saved) return JSON.parse(saved);
+  }catch(err){
+    console.warn('Không đọc được KPI tháng đã lưu:', err);
+  }
+  return {};
+}
+
+function saveMonthlyKpis(){
+  localStorage.setItem(monthlyKpiStorageKey, JSON.stringify(monthlyKpis));
+}
+
+function toNumber(value){
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+async function uploadShowroomImage(file, showroomName){
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const slug = String(showroomName || 'showroom')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `showrooms/${slug || 'showroom'}/${safeName}`;
+  const { error } = await supabaseClient.storage.from(BUCKET_NAME).upload(path, file, { upsert:false });
+  if(error) throw error;
+  const { data } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 function setDefaultMonth(){
@@ -222,8 +826,10 @@ function updateStats(){
   renderKeyValueStats('showroomStats', countBy(monthPosts, p => showroomList(p.showroom || 'Chưa chọn')));
 }
 
-function openModal(){
+function openModal(preset = {}){
   clearForm();
+  if(preset.platform) setPlatformChecks(preset.platform);
+  if(preset.showroom) setShowroomChecks(preset.showroom);
   $('postModal').classList.add('open');
 }
 function closeModal(){ $('postModal').classList.remove('open'); }
@@ -247,36 +853,64 @@ function getShowroomChecks(){ return getChecks('showroomCheck'); }
 function clearForm(){
   editingId = null;
   editingImageUrls = [];
+  editingMediaUrls = [];
+  editingThumbnailUrl = '';
   $('modalTitle').innerText = 'Tạo bài mới';
   setPlatformChecks('Facebook');
   setShowroomChecks('HO');
   $('title').value = '';
   $('postDate').value = '';
+  $('postTime').value = '';
   $('postStatus').value = 'Ý tưởng';
+  $('postLink').value = '';
+  $('owner').value = '';
+  $('hashtags').value = '';
   $('note').value = '';
+  $('content').value = '';
   $('imageInput').value = '';
+  $('thumbnailInput').value = '';
   $('previewWrap').innerHTML = '';
 }
 
 function previewImages(){
   const files = Array.from($('imageInput').files || []);
   $('previewWrap').innerHTML = '';
-  if(files.length === 0) return;
+  const thumbnail = $('thumbnailInput').files && $('thumbnailInput').files[0];
+  if(files.length === 0 && !thumbnail) return;
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = e => {
-      const img = document.createElement('img');
-      img.src = e.target.result;
-      img.className = 'preview';
-      img.style.display = 'block';
-      $('previewWrap').appendChild(img);
+      $('previewWrap').appendChild(createPreviewNode(file, e.target.result));
     };
     reader.readAsDataURL(file);
   });
+  if(thumbnail){
+    const reader = new FileReader();
+    reader.onload = e => {
+      const node = createPreviewNode(thumbnail, e.target.result);
+      node.classList.add('is-thumbnail');
+      $('previewWrap').prepend(node);
+    };
+    reader.readAsDataURL(thumbnail);
+  }
 }
 
 function renderExistingPreview(urls){
-  $('previewWrap').innerHTML = urls.map(url => `<img src="${escapeHtml(url)}" class="preview" style="display:block">`).join('');
+  const media = [...(editingThumbnailUrl ? [editingThumbnailUrl] : []), ...urls];
+  $('previewWrap').innerHTML = media.map(url => `<img src="${escapeHtml(url)}" class="preview" style="display:block">`).join('');
+}
+
+function createPreviewNode(file, src){
+  if(file.type.startsWith('image/')){
+    const img = document.createElement('img');
+    img.src = src;
+    img.className = 'preview';
+    return img;
+  }
+  const box = document.createElement('div');
+  box.className = 'file-preview';
+  box.textContent = file.name;
+  return box;
 }
 
 async function savePost(){
@@ -290,18 +924,32 @@ async function savePost(){
   $('btnSave').innerText = 'Đang lưu...';
   try{
     let imageUrls = editingImageUrls || [];
+    let mediaUrls = editingMediaUrls || [];
+    let thumbnailUrl = editingThumbnailUrl || '';
     const files = Array.from($('imageInput').files || []);
-    if(files.length){ imageUrls = await uploadImages(files); }
+    if(files.length){
+      mediaUrls = await uploadFiles(files, 'posts');
+      imageUrls = mediaUrls.filter(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url));
+    }
+    const thumbnail = $('thumbnailInput').files && $('thumbnailInput').files[0];
+    if(thumbnail){ thumbnailUrl = await uploadFile(thumbnail, 'thumbnails'); }
 
     const payload = {
       platform: selectedPlatforms.join(', '),
       showroom: selectedShowrooms.join(', '),
       title,
       post_date: $('postDate').value || null,
+      post_time: $('postTime').value || null,
       status: $('postStatus').value,
+      post_link: $('postLink').value.trim(),
+      owner: $('owner').value.trim(),
+      hashtags: $('hashtags').value.trim(),
       note: $('note').value.trim(),
+      content: $('content').value.trim(),
       image_url: imageUrls[0] || '',
-      image_urls: imageUrls
+      image_urls: imageUrls,
+      media_urls: mediaUrls,
+      thumbnail_url: thumbnailUrl
     };
 
     let error;
@@ -326,15 +974,27 @@ async function savePost(){
 async function uploadImages(files){
   const urls = [];
   for(const file of files){
-    urls.push(await uploadImage(file));
+    urls.push(await uploadFile(file, 'posts'));
   }
   return urls;
 }
 
 async function uploadImage(file){
+  return uploadFile(file, 'posts');
+}
+
+async function uploadFiles(files, folder){
+  const urls = [];
+  for(const file of files){
+    urls.push(await uploadFile(file, folder));
+  }
+  return urls;
+}
+
+async function uploadFile(file, folder){
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const path = `posts/${safeName}`;
+  const path = `${folder}/${safeName}`;
   const { error } = await supabaseClient.storage.from(BUCKET_NAME).upload(path, file, { upsert:false });
   if(error) throw error;
   const { data } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(path);
@@ -346,15 +1006,23 @@ function editPost(id){
   if(!p) return;
   editingId = p.id;
   editingImageUrls = getImageUrls(p);
+  editingMediaUrls = getMediaUrls(p);
+  editingThumbnailUrl = p.thumbnail_url || '';
   $('modalTitle').innerText = 'Sửa bài đăng';
   setPlatformChecks(p.platform || 'Facebook');
   setShowroomChecks(p.showroom || 'HO');
   $('title').value = p.title || '';
   $('postDate').value = p.post_date || '';
+  $('postTime').value = p.post_time || '';
   $('postStatus').value = p.status || 'Ý tưởng';
+  $('postLink').value = p.post_link || '';
+  $('owner').value = p.owner || '';
+  $('hashtags').value = p.hashtags || '';
   $('note').value = p.note || '';
+  $('content').value = p.content || '';
   $('imageInput').value = '';
-  renderExistingPreview(editingImageUrls);
+  $('thumbnailInput').value = '';
+  renderExistingPreview(editingMediaUrls);
   $('postModal').classList.add('open');
 }
 
@@ -420,11 +1088,13 @@ function getExportSourcePosts(){
 function getExportValue(post, key, index){
   if(key === 'stt') return index + 1;
   if(key === 'post_date') return formatDate(post.post_date);
+  if(key === 'post_time') return post.post_time || '';
   if(key === 'week') {
     const week = getWeekOfMonth(post.post_date);
     return week ? `Tuần ${Math.min(week, 5)}` : '';
   }
   if(key === 'image_urls') return getImageUrls(post).join('\n');
+  if(key === 'media_urls') return getMediaUrls(post).join('\n');
   if(key === 'created_at') return post.created_at ? new Date(post.created_at).toLocaleString('vi-VN') : '';
   return post[key] || '';
 }
@@ -464,14 +1134,8 @@ async function exportExcel(){
   }
   const selectedFields = exportFields.filter(f => f.checked);
   if(selectedFields.length === 0){ alert('Vui lòng chọn ít nhất 1 trường để xuất'); return; }
-const source = getExportSourcePosts()
-  .slice()
-  .sort((a, b) => {
-    if (!a.post_date && !b.post_date) return 0;
-    if (!a.post_date) return 1;
-    if (!b.post_date) return -1;
-    return new Date(a.post_date) - new Date(b.post_date);
-  });  if(source.length === 0){ alert('Không có dữ liệu để xuất'); return; }
+  const source = getExportSourcePosts();
+  if(source.length === 0){ alert('Không có dữ liệu để xuất'); return; }
 
   const exportBtn = $('btnExportExcel');
   exportBtn.disabled = true;
