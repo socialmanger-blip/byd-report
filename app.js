@@ -464,8 +464,14 @@ async function exportExcel(){
   }
   const selectedFields = exportFields.filter(f => f.checked);
   if(selectedFields.length === 0){ alert('Vui lòng chọn ít nhất 1 trường để xuất'); return; }
-  const source = getExportSourcePosts();
-  if(source.length === 0){ alert('Không có dữ liệu để xuất'); return; }
+const source = getExportSourcePosts()
+  .slice()
+  .sort((a, b) => {
+    if (!a.post_date && !b.post_date) return 0;
+    if (!a.post_date) return 1;
+    if (!b.post_date) return -1;
+    return new Date(a.post_date) - new Date(b.post_date);
+  });  if(source.length === 0){ alert('Không có dữ liệu để xuất'); return; }
 
   const exportBtn = $('btnExportExcel');
   exportBtn.disabled = true;
