@@ -200,7 +200,7 @@ function showroomMatches(value, showroom){
 }
 
 function showroomDisplayName(showroom){
-  return showroom === 'HO' ? 'BYD NEG Việt Nam' : showroom;
+  return showroom === 'HO' ? 'BYD NEG Việt Nam' : `BYD NEG ${showroom}`;
 }
 
 function getImageUrls(post){
@@ -484,21 +484,38 @@ function renderContentCalendar(items, month){
 }
 
 function getShowroomChannelLink(platform, showroom){
+  return getShowroomChannelAccount(platform, showroom).link || '';
+}
+
+function getShowroomChannelAccount(platform, showroom){
   const accounts = channelAccounts[platform] || [];
   const found = accounts.find(account => account.showroom === showroom);
-  return found ? found.link || '' : '';
+  return found || { showroom, link:'', avatar:'' };
 }
 
 function setShowroomChannelLink(platform, showroom, link){
   if(!channelAccounts[platform]){
-    channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'' }));
+    channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'', avatar:'' }));
   }
   let found = channelAccounts[platform].find(account => account.showroom === showroom);
   if(!found){
-    found = { showroom, link:'' };
+    found = { showroom, link:'', avatar:'' };
     channelAccounts[platform].push(found);
   }
   found.link = link;
+  saveChannelAccounts();
+}
+
+function setShowroomChannelAvatar(platform, showroom, avatar){
+  if(!channelAccounts[platform]){
+    channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'', avatar:'' }));
+  }
+  let found = channelAccounts[platform].find(account => account.showroom === showroom);
+  if(!found){
+    found = { showroom, link:'', avatar:'' };
+    channelAccounts[platform].push(found);
+  }
+  found.avatar = avatar;
   saveChannelAccounts();
 }
 
@@ -543,12 +560,21 @@ function renderChannelAccounts(){
     const done = channelPosts.filter(post => post.status === 'Đã đăng').length;
     const pending = channelPosts.filter(post => post.status === 'Chờ duyệt').length;
     const idea = channelPosts.filter(post => post.status === 'Ý tưởng').length;
-    const link = getShowroomChannelLink(currentPlatform, showroom);
+    const account = getShowroomChannelAccount(currentPlatform, showroom);
+    const link = account.link || '';
+    const avatar = account.avatar || '';
+    const avatarLabel = currentPlatform === 'YouTube' ? 'Logo kênh' : 'Avatar kênh';
+    const avatarNode = avatar
+      ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(showroomDisplayName(showroom))}" loading="lazy">`
+      : `<span>${escapeHtml(avatarLabel)}</span>`;
     return `
       <article class="account-card">
         <div class="channel-head">
-          <div>
-            <span class="service-badge">${escapeHtml(showroom === 'HO' ? 'VN' : showroom.slice(0, 2).toUpperCase())}</span>
+          <div class="account-title">
+            <label class="account-avatar" title="Bấm để upload ${escapeHtml(avatarLabel.toLowerCase())}">
+              ${avatarNode}
+              <input type="file" accept="image/*" data-account-avatar-showroom="${escapeHtml(showroom)}">
+            </label>
             <h4>${escapeHtml(showroomDisplayName(showroom))}</h4>
           </div>
         </div>
@@ -558,16 +584,24 @@ function renderChannelAccounts(){
           <div><b>${pending}</b><span>Chờ duyệt</span></div>
           <div><b>${idea}</b><span>Ý tưởng</span></div>
         </div>
-        <div class="readonly-line"><span>Link account</span><b>${link ? 'Đã lưu' : 'Chưa có'}</b></div>
+        <label>Link account
+          <input type="url" placeholder="Dán link ${escapeHtml(currentPlatform)}" value="${escapeHtml(link)}" data-account-showroom="${escapeHtml(showroom)}">
+        </label>
         <a class="open-link ${link ? '' : 'is-disabled'}" href="${escapeHtml(link || '#')}" target="_blank" rel="noopener">Mở account</a>
       </article>
     `;
   }).join('');
+  document.querySelectorAll('[data-account-showroom]').forEach(input => {
+    input.addEventListener('change', handleAccountInput);
+  });
+  document.querySelectorAll('[data-account-avatar-showroom]').forEach(input => {
+    input.addEventListener('change', handleAccountAvatarInput);
+  });
 }
 
 function getAccountsForCurrentPlatform(){
   if(!channelAccounts[currentPlatform]){
-    channelAccounts[currentPlatform] = showroomNames.map(showroom => ({ showroom, link:'' }));
+    channelAccounts[currentPlatform] = showroomNames.map(showroom => ({ showroom, link:'', avatar:'' }));
   }
   return channelAccounts[currentPlatform];
 }
@@ -575,6 +609,23 @@ function getAccountsForCurrentPlatform(){
 function handleAccountInput(event){
   setShowroomChannelLink(currentPlatform, event.target.dataset.accountShowroom, event.target.value.trim());
   renderChannelAccounts();
+}
+
+async function handleAccountAvatarInput(event){
+  const showroom = event.target.dataset.accountAvatarShowroom;
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  event.target.disabled = true;
+  try{
+    const url = await uploadFile(file, 'channel-avatars');
+    setShowroomChannelAvatar(currentPlatform, showroom, url);
+    renderChannelAccounts();
+  }catch(err){
+    console.error(err);
+    alert('Lỗi upload ảnh đại diện kênh: ' + err.message);
+  }finally{
+    event.target.disabled = false;
+  }
 }
 
 function renderGoogleMapShowrooms(){
@@ -707,10 +758,10 @@ function loadChannelAccounts(){
     console.warn('Không đọc được link account đã lưu:', err);
   }
   return {
-    Facebook: showroomNames.map(showroom => ({ showroom, link:'' })),
-    TikTok: showroomNames.map(showroom => ({ showroom, link:'' })),
-    'Zalo OA': showroomNames.map(showroom => ({ showroom, link:'' })),
-    YouTube: [{ showroom:'HO', link:'' }]
+    Facebook: showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
+    TikTok: showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
+    'Zalo OA': showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
+    YouTube: [{ showroom:'HO', link:'', avatar:'' }]
   };
 }
 
