@@ -9,14 +9,25 @@ let editingThumbnailUrl = '';
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
 const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
-const reportShowroomNames = ['Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
-const showroomNames = ['HO', ...reportShowroomNames];
+const mediaLibraryStorageKey = 'socialhub_media_library_v1';
+const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
+const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
 const defaultGoogleMapShowrooms = [
   {
+    type: 'HQ',
+    brand: 'BYD NEG',
+    name: 'TRỤ SỞ CHÍNH',
+    reviews: 0,
+    target: 100,
+    address: 'Căn 18 Lake View 1, Số 19 Tố Hữu, Phường An Khánh, Thành phố Hồ Chí Minh.',
+    image: '',
+    mapLink: ''
+  },
+  {
     type: '4S',
     brand: 'BYD NEG',
-    name: 'Showroom 4S BYD NEG TIỀN GIANG',
+    name: 'BYD NEG TIỀN GIANG',
     reviews: 0,
     target: 100,
     address: '602 Quốc lộ 1, Khu Phố Phước Hòa, Phường Trung An, Tỉnh Đồng Tháp.',
@@ -26,7 +37,7 @@ const defaultGoogleMapShowrooms = [
   {
     type: '1S',
     brand: 'BYD NEG',
-    name: 'Showroom 1S BYD NEG KIÊN GIANG',
+    name: 'BYD NEG KIÊN GIANG',
     reviews: 0,
     target: 100,
     address: 'Lô P3-01, Đường 3 Tháng 2, Phường Rạch Giá, Tỉnh An Giang.',
@@ -36,7 +47,7 @@ const defaultGoogleMapShowrooms = [
   {
     type: '4S',
     brand: 'BYD NEG',
-    name: 'Showroom 4S BYD NEG PHÚ QUỐC',
+    name: 'BYD NEG PHÚ QUỐC',
     reviews: 0,
     target: 100,
     address: 'Tổ 7, Khu phố Suối Đá Dương Tơ, Đặc khu Phú Quốc, Tỉnh An Giang.',
@@ -44,22 +55,22 @@ const defaultGoogleMapShowrooms = [
     mapLink: ''
   },
   {
-    type: '4S',
+    type: '1S',
     brand: 'BYD NEG',
-    name: 'Showroom 4S BYD NEG CẦN THƠ',
+    name: 'BYD NEG AN GIANG',
     reviews: 0,
     target: 100,
-    address: '384 Võ Nguyên Giáp, Phường Hưng Phú, Thành Phố Cần Thơ.',
+    address: '43/12 Trần Hưng Đạo, Phường Mỹ Thới, Tỉnh An Giang.',
     image: '',
     mapLink: ''
   },
   {
-    type: '1S',
+    type: '4S',
     brand: 'BYD NEG',
-    name: 'Showroom 1S BYD NEG AN GIANG',
+    name: 'BYD NEG CẦN THƠ',
     reviews: 0,
     target: 100,
-    address: '43/12 Trần Hưng Đạo, Phường Mỹ Thới, Tỉnh An Giang.',
+    address: '384 Võ Nguyên Giáp, Phường Hưng Phú, TP. Cần Thơ.',
     image: '',
     mapLink: ''
   }
@@ -67,6 +78,10 @@ const defaultGoogleMapShowrooms = [
 let googleMapShowrooms = loadGoogleMapShowrooms();
 let channelAccounts = loadChannelAccounts();
 let monthlyKpis = loadMonthlyKpis();
+let mediaLibrary = loadMediaLibrary();
+let currentMediaFolder = 'all';
+let selectedLibraryMediaUrls = [];
+let pendingPickedMedia = new Set();
 
 const defaultExportFields = [
   { key:'stt', label:'STT', checked:true },
@@ -77,9 +92,6 @@ const defaultExportFields = [
   { key:'post_time', label:'Giờ đăng', checked:false },
   { key:'week', label:'Tuần trong tháng', checked:true },
   { key:'status', label:'Trạng thái', checked:true },
-  { key:'owner', label:'Người phụ trách', checked:true },
-  { key:'post_link', label:'Link bài', checked:true },
-  { key:'hashtags', label:'Hashtag', checked:false },
   { key:'note', label:'Caption', checked:true },
   { key:'image_urls', label:'Ảnh', checked:true },
   { key:'media_urls', label:'Media', checked:false },
@@ -109,8 +121,18 @@ function bindEvents(){
   $('btnExportExcel').addEventListener('click', exportExcel);
   $('btnResetExportFields').addEventListener('click', resetExportFields);
   $('btnResetGoogleReport').addEventListener('click', resetGoogleMapReport);
+  $('btnOpenMediaLibrary').addEventListener('click', openMediaLibrary);
+  $('btnCreateMediaFolder').addEventListener('click', createMediaFolder);
+  $('btnMediaUpload').addEventListener('click', () => $('mediaUploadInput').click());
+  $('mediaUploadInput').addEventListener('change', (e) => uploadMediaLibraryFiles(Array.from(e.target.files || [])));
+  $('mediaSearch').addEventListener('input', renderMediaLibrary);
+  $('mediaFolderFilter').addEventListener('change', (e) => { currentMediaFolder = e.target.value; renderMediaLibrary(); });
+  $('btnPickMedia').addEventListener('click', openMediaPicker);
+  $('btnCloseMediaPicker').addEventListener('click', closeMediaPicker);
+  $('btnCancelMediaPicker').addEventListener('click', closeMediaPicker);
+  $('btnUsePickedMedia').addEventListener('click', usePickedMedia);
+  $('mediaPickerSearch').addEventListener('input', renderMediaPicker);
   $('searchInput').addEventListener('input', renderPosts);
-  $('ownerFilter').addEventListener('input', renderPosts);
   $('statusFilter').addEventListener('change', renderPosts);
   $('yearFilter').addEventListener('change', renderPosts);
   $('sortFilter').addEventListener('change', renderPosts);
@@ -119,10 +141,13 @@ function bindEvents(){
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
+  $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('imageInput').addEventListener('change', previewImages);
   $('thumbnailInput').addEventListener('change', previewImages);
+  setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
+      closeMediaLibraryView();
       document.querySelectorAll('.nav').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       setActiveShowroomNav('all');
@@ -133,6 +158,7 @@ function bindEvents(){
   });
   document.querySelectorAll('.showroom-nav').forEach(btn => {
     btn.addEventListener('click', () => {
+      closeMediaLibraryView();
       document.querySelectorAll('.showroom-nav').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       setActivePlatformNav('all');
@@ -155,6 +181,20 @@ function setActiveShowroomNav(showroom){
   });
 }
 
+function openMediaLibrary(){
+  document.querySelectorAll('.nav,.showroom-nav').forEach(btn => btn.classList.remove('active'));
+  $('btnOpenMediaLibrary').classList.add('active');
+  $('mediaLibrary').classList.add('is-visible');
+  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
+  renderMediaLibrary();
+}
+
+function closeMediaLibraryView(){
+  $('btnOpenMediaLibrary').classList.remove('active');
+  $('mediaLibrary').classList.remove('is-visible');
+  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.remove('is-hidden'));
+}
+
 async function loadPosts(){
   setStatus('Đang tải dữ liệu từ Supabase...', true);
   const { data, error } = await supabaseClient
@@ -165,7 +205,7 @@ async function loadPosts(){
   if(error){
     console.error(error);
     setStatus('Lỗi kết nối Supabase: ' + error.message, false);
-    $('postTable').innerHTML = `<tr><td colspan="9" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
+    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
   posts = data || [];
@@ -177,7 +217,7 @@ async function loadPosts(){
 function updateYearFilter(){
   const selected = $('yearFilter').value || 'all';
   const years = [...new Set(posts.map(p => String(p.post_date || '').slice(0,4)).filter(Boolean))].sort().reverse();
-  $('yearFilter').innerHTML = '<option value="all">Tất cả năm</option>' + years.map(year => `<option value="${year}">${year}</option>`).join('');
+  $('yearFilter').innerHTML = '<option value="all">Năm</option>' + years.map(year => `<option value="${year}">${year}</option>`).join('');
   $('yearFilter').value = years.includes(selected) ? selected : 'all';
 }
 
@@ -229,7 +269,6 @@ function renderImages(post){
 
 function getFilteredPosts(){
   const keyword = $('searchInput').value.toLowerCase().trim();
-  const owner = $('ownerFilter').value.toLowerCase().trim();
   const status = $('statusFilter').value;
   const year = $('yearFilter').value;
   const sort = $('sortFilter').value;
@@ -237,10 +276,9 @@ function getFilteredPosts(){
     const matchPlatform = platformMatches(p.platform, currentPlatform);
     const matchStatus = status === 'all' || p.status === status;
     const matchShowroom = showroomMatches(p.showroom, currentShowroom);
-    const matchOwner = !owner || String(p.owner || '').toLowerCase().includes(owner);
     const matchYear = year === 'all' || String(p.post_date || '').slice(0,4) === year;
-    const text = `${p.title||''} ${p.note||''} ${p.content||''} ${p.showroom||''} ${p.platform||''} ${p.owner||''} ${p.hashtags||''}`.toLowerCase();
-    return matchPlatform && matchStatus && matchShowroom && matchOwner && matchYear && text.includes(keyword);
+    const text = `${p.title||''} ${p.note||''} ${p.showroom||''} ${p.platform||''}`.toLowerCase();
+    return matchPlatform && matchStatus && matchShowroom && matchYear && text.includes(keyword);
   });
   return sortPosts(filtered, sort);
 }
@@ -259,9 +297,10 @@ function renderPosts(){
   updateChannelAccountSection();
   renderShowroomDashboard();
   updateWorkspaceActions();
+  updateReportPanels();
   updateStats();
   if(result.length === 0){
-    $('postTable').innerHTML = `<tr><td colspan="9" class="empty">Chưa có bài đăng nào</td></tr>`;
+    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Chưa có bài đăng nào</td></tr>`;
     return;
   }
   $('postTable').innerHTML = result.map(p => `
@@ -272,11 +311,17 @@ function renderPosts(){
       <td><b class="post-title">${escapeHtml(p.title || '-')}</b></td>
       <td>${formatDate(p.post_date)}</td>
       <td><span class="status-pill ${getStatusClass(p.status)}">${escapeHtml(p.status || '-')}</span></td>
-      <td>${escapeHtml(p.owner || '-')}</td>
       <td><div class="note-cell" title="${escapeHtml(p.note || '')}">${escapeHtml(p.note || '-')}</div></td>
       <td>${renderRowActions(p)}</td>
     </tr>
   `).join('');
+}
+
+function updateReportPanels(){
+  const platformPanel = $('platformStats') ? $('platformStats').closest('.report-panel') : null;
+  if(platformPanel){
+    platformPanel.classList.toggle('is-hidden', currentPlatform !== 'all' && currentShowroom === 'all');
+  }
 }
 
 function renderRowActions(post){
@@ -310,6 +355,7 @@ function updateGoogleMapSection(){
   if(!section) return;
   const isGoogleMap = currentPlatform === 'Google Maps' && currentShowroom === 'all';
   section.classList.toggle('is-visible', isGoogleMap);
+  section.classList.toggle('is-hidden', !isGoogleMap);
   document.querySelectorAll('.post-content').forEach(el => {
     if(el.classList.contains('top-actions')) return;
     el.classList.toggle('is-hidden', isGoogleMap);
@@ -321,6 +367,7 @@ function updateChannelAccountSection(){
   if(!section) return;
   const isAccountPlatform = currentPlatform !== 'all' && currentPlatform !== 'Google Maps' && currentShowroom === 'all';
   section.classList.toggle('is-visible', isAccountPlatform);
+  section.classList.toggle('is-hidden', !isAccountPlatform);
   if(isAccountPlatform) renderChannelAccounts();
 }
 
@@ -550,7 +597,7 @@ function renderChannelAccounts(){
   const overviewShowrooms = currentPlatform === 'YouTube' ? ['HO'] : reportShowroomNames;
   $('channelAccountTitle').innerText = currentPlatform === 'YouTube'
     ? 'Tổng quan YouTube - BYD NEG Việt Nam'
-    : `Tổng quan ${currentPlatform} - 5 showroom`;
+    : `Tổng quan ${currentPlatform} - 6 đơn vị`;
   const month = $('monthFilter').value;
   target.innerHTML = overviewShowrooms.map(showroom => {
     const channelPosts = posts.filter(post => {
@@ -631,6 +678,7 @@ async function handleAccountAvatarInput(event){
 function renderGoogleMapShowrooms(){
   const target = $('googleShowroomGrid');
   if(!target) return;
+  googleMapShowrooms = mergeGoogleMapDefaults(googleMapShowrooms);
   updateGoogleSummary();
   target.innerHTML = googleMapShowrooms.map((showroom, index) => {
     const reviews = toNumber(showroom.reviews);
@@ -739,11 +787,37 @@ function resetGoogleMapReport(){
 function loadGoogleMapShowrooms(){
   try{
     const saved = localStorage.getItem(googleMapStorageKey);
-    if(saved) return JSON.parse(saved);
+    if(saved) return mergeGoogleMapDefaults(JSON.parse(saved));
   }catch(err){
     console.warn('Không đọc được dữ liệu Google Maps đã lưu:', err);
   }
   return JSON.parse(JSON.stringify(defaultGoogleMapShowrooms));
+}
+
+function mergeGoogleMapDefaults(saved){
+  const existing = Array.isArray(saved) ? saved : [];
+  const merged = defaultGoogleMapShowrooms.map(defaultItem => {
+    const key = showroomKeyFromGoogleName(defaultItem.name);
+    const found = existing.find(item => showroomKeyFromGoogleName(item.name || '') === key);
+    return found ? {
+      ...defaultItem,
+      reviews: found.reviews || 0,
+      target: found.target || defaultItem.target,
+      image: found.image || '',
+      mapLink: found.mapLink || ''
+    } : { ...defaultItem };
+  });
+  return merged;
+}
+
+function showroomKeyFromGoogleName(name){
+  if(name.includes('TRỤ SỞ') || name.includes('Trụ sở') || name.includes('Việt Nam')) return 'Trụ sở chính';
+  if(name.includes('Phú Quốc')) return 'Phú Quốc';
+  if(name.includes('Cần Thơ')) return 'Cần Thơ';
+  if(name.includes('Kiên Giang')) return 'Kiên Giang';
+  if(name.includes('An Giang')) return 'An Giang';
+  if(name.includes('Tiền Giang')) return 'Tiền Giang';
+  return 'Trụ sở chính';
 }
 
 function saveGoogleMapShowrooms(){
@@ -753,16 +827,32 @@ function saveGoogleMapShowrooms(){
 function loadChannelAccounts(){
   try{
     const saved = localStorage.getItem(channelAccountStorageKey);
-    if(saved) return JSON.parse(saved);
+    if(saved) return mergeChannelAccountDefaults(JSON.parse(saved));
   }catch(err){
     console.warn('Không đọc được link account đã lưu:', err);
   }
+  return createDefaultChannelAccounts();
+}
+
+function createDefaultChannelAccounts(){
   return {
     Facebook: showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
     TikTok: showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
     'Zalo OA': showroomNames.map(showroom => ({ showroom, link:'', avatar:'' })),
     YouTube: [{ showroom:'HO', link:'', avatar:'' }]
   };
+}
+
+function mergeChannelAccountDefaults(saved){
+  const defaults = createDefaultChannelAccounts();
+  Object.keys(defaults).forEach(platform => {
+    const existing = Array.isArray(saved && saved[platform]) ? saved[platform] : [];
+    defaults[platform] = defaults[platform].map(item => {
+      const found = existing.find(account => account.showroom === item.showroom);
+      return found ? { ...item, ...found } : item;
+    });
+  });
+  return defaults;
 }
 
 function saveChannelAccounts(){
@@ -781,6 +871,314 @@ function loadMonthlyKpis(){
 
 function saveMonthlyKpis(){
   localStorage.setItem(monthlyKpiStorageKey, JSON.stringify(monthlyKpis));
+}
+
+function defaultMediaFolders(){
+  return [
+    'Hình ảnh sản phẩm/Sealion 6',
+    'Hình ảnh sản phẩm/Seal 5',
+    'Hình ảnh sản phẩm/M6',
+    'Hình ảnh sản phẩm/M9',
+    'Hình ảnh sản phẩm/Atto 2',
+    'Hình ảnh sản phẩm/Dolphin',
+    'Video sản phẩm',
+    'Logo & Bộ nhận diện thương hiệu/Brand Guideline',
+    'Brochure/Brochure sản phẩm',
+    'Brochure/Brochure showroom',
+    'Tài liệu đào tạo/Đào tạo sản phẩm',
+    'Tài liệu đào tạo/Đào tạo bán hàng',
+    'Tài liệu đào tạo/Đào tạo Marketing',
+    'SOP/Quy trình',
+    'SOP/Chính sách',
+    'SOP/Checklist',
+    'Hình ảnh Showroom/Trụ sở chính',
+    'Hình ảnh Showroom/Phú Quốc',
+    'Hình ảnh Showroom/Cần Thơ',
+    'Hình ảnh Showroom/Kiên Giang',
+    'Hình ảnh Showroom/An Giang',
+    'Hình ảnh Showroom/Tiền Giang',
+    'Banner & Template',
+    'Chiến dịch Marketing/Khai trương',
+    'Chiến dịch Marketing/Roadshow',
+    'Chiến dịch Marketing/Caravan',
+    'Chiến dịch Marketing/Triển lãm',
+    'Chiến dịch Marketing/Khuyến mãi',
+    'Chiến dịch Marketing/Livestream',
+    'Chiến dịch Marketing/Khác',
+    'Tài liệu khác/Báo giá',
+    'Tài liệu khác/Hợp đồng mẫu',
+    'Tài liệu khác/Excel',
+    'Tài liệu khác/Word',
+    'Tài liệu khác/PDF',
+    'Tài liệu khác/Biểu mẫu',
+    'Tài liệu khác/Tài liệu nội bộ'
+  ];
+}
+
+function loadMediaLibrary(){
+  try{
+    const saved = localStorage.getItem(mediaLibraryStorageKey);
+    if(saved){
+      const parsed = JSON.parse(saved);
+      return {
+        folders: [...new Set([...defaultMediaFolders(), ...(parsed.folders || [])])],
+        files: parsed.files || []
+      };
+    }
+  }catch(err){
+    console.warn('Không đọc được Media Library:', err);
+  }
+  return { folders: defaultMediaFolders(), files: [] };
+}
+
+function saveMediaLibrary(){
+  localStorage.setItem(mediaLibraryStorageKey, JSON.stringify(mediaLibrary));
+}
+
+function renderMediaLibrary(){
+  renderMediaFolders();
+  renderMediaFiles();
+}
+
+function renderMediaFolders(){
+  const folders = ['all', ...mediaLibrary.folders];
+  $('mediaFolderFilter').innerHTML = folders.map(folder => `
+    <option value="${escapeHtml(folder)}" ${folder === currentMediaFolder ? 'selected' : ''}>${folder === 'all' ? 'Tất cả thư mục' : escapeHtml(folder)}</option>
+  `).join('');
+  $('mediaFolderTree').innerHTML = folders.map(folder => `
+    <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''}">
+      <button onclick="selectMediaFolder('${escapeJs(folder)}')">${folder === 'all' ? 'Tất cả thư mục' : escapeHtml(folder)}</button>
+      ${folder === 'all' ? '' : `<button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>`}
+    </div>
+  `).join('');
+}
+
+function selectMediaFolder(folder){
+  currentMediaFolder = folder;
+  renderMediaLibrary();
+}
+
+function getFilteredMediaFiles(){
+  const keyword = $('mediaSearch').value.toLowerCase().trim();
+  return mediaLibrary.files.filter(file => {
+    const matchFolder = currentMediaFolder === 'all' || file.folder === currentMediaFolder;
+    const text = `${file.name} ${file.folder}`.toLowerCase();
+    return matchFolder && text.includes(keyword);
+  });
+}
+
+function renderMediaFiles(){
+  const files = getFilteredMediaFiles();
+  if(!files.length){
+    $('mediaGrid').innerHTML = '<div class="empty-mini">Chưa có tài nguyên trong thư mục này</div>';
+    return;
+  }
+  $('mediaGrid').innerHTML = files.map(file => `
+    <article class="media-card">
+      <div class="media-preview" onclick="previewMedia('${escapeJs(file.url)}','${escapeJs(file.type)}')">${renderMediaThumb(file)}</div>
+      <div class="media-info">
+        <b title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</b>
+        <span>${escapeHtml(file.folder)}</span>
+      </div>
+      <div class="media-actions">
+        <button onclick="renameMediaFile('${file.id}')">Đổi tên</button>
+        <button onclick="moveMediaFile('${file.id}')">Di chuyển</button>
+        <button onclick="downloadMediaFile('${file.id}')">Tải xuống</button>
+        <button class="danger" onclick="deleteMediaFile('${file.id}')">Xóa</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+function renderMediaThumb(file){
+  if(file.type.startsWith('image/')) return `<img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.name)}">`;
+  if(file.type.startsWith('video/')) return '<div class="file-preview">Video</div>';
+  return '<div class="file-preview">Tài liệu</div>';
+}
+
+function setupMediaDropZone(){
+  const zone = $('mediaDropZone');
+  const prevent = e => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    document.addEventListener(eventName, prevent, false);
+  });
+  zone.addEventListener('click', () => $('mediaUploadInput').click());
+  zone.addEventListener('dragover', e => {
+    zone.classList.add('is-dragging');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-dragging'));
+  zone.addEventListener('drop', e => {
+    zone.classList.remove('is-dragging');
+    uploadMediaLibraryFiles(Array.from(e.dataTransfer.files || []));
+  });
+  $('mediaLibrary').addEventListener('drop', e => {
+    zone.classList.remove('is-dragging');
+    uploadMediaLibraryFiles(Array.from(e.dataTransfer.files || []));
+  });
+}
+
+async function uploadMediaLibraryFiles(files){
+  if(!files.length) return;
+  const folder = currentMediaFolder === 'all' ? (mediaLibrary.folders[0] || 'Tài liệu khác') : currentMediaFolder;
+  try{
+    $('mediaDropZone').innerText = `Đang upload ${files.length} tệp...`;
+    for(const file of files){
+      const url = await uploadFile(file, 'media-library');
+      mediaLibrary.files.unshift({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        folder,
+        url,
+        type: file.type || 'application/octet-stream',
+        size: file.size,
+        uploadedAt: new Date().toISOString()
+      });
+    }
+    saveMediaLibrary();
+    $('mediaUploadInput').value = '';
+    $('mediaDropZone').innerText = `Đã upload ${files.length} tệp vào ${folder}`;
+    renderMediaLibrary();
+  }catch(err){
+    console.error(err);
+    alert('Lỗi upload Media Library: ' + err.message);
+    $('mediaDropZone').innerText = 'Kéo và thả tệp vào đây để upload';
+  }
+}
+
+function createMediaFolder(){
+  const name = prompt('Nhập tên thư mục hoặc đường dẫn thư mục con');
+  if(!name) return;
+  const folder = name.trim();
+  if(!folder) return;
+  if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
+  currentMediaFolder = folder;
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function deleteMediaFolder(folder){
+  const fileCount = mediaLibrary.files.filter(file => file.folder === folder).length;
+  const message = fileCount
+    ? `Xóa thư mục "${folder}" và ${fileCount} tệp trong thư mục khỏi Media Library?`
+    : `Xóa thư mục "${folder}"?`;
+  if(!confirm(message)) return;
+  mediaLibrary.folders = mediaLibrary.folders.filter(item => item !== folder);
+  mediaLibrary.files = mediaLibrary.files.filter(file => file.folder !== folder);
+  if(currentMediaFolder === folder) currentMediaFolder = 'all';
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function renameMediaFile(id){
+  const file = mediaLibrary.files.find(item => item.id === id);
+  if(!file) return;
+  const name = prompt('Tên mới', file.name);
+  if(!name) return;
+  file.name = name.trim();
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function moveMediaFile(id){
+  const file = mediaLibrary.files.find(item => item.id === id);
+  if(!file) return;
+  const folder = prompt('Di chuyển tới thư mục', file.folder);
+  if(!folder) return;
+  file.folder = folder.trim();
+  if(!mediaLibrary.folders.includes(file.folder)) mediaLibrary.folders.push(file.folder);
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function deleteMediaFile(id){
+  if(!confirm('Xóa tài nguyên khỏi Media Library?')) return;
+  mediaLibrary.files = mediaLibrary.files.filter(file => file.id !== id);
+  saveMediaLibrary();
+  renderMediaLibrary();
+}
+
+function downloadMediaFile(id){
+  const file = mediaLibrary.files.find(item => item.id === id);
+  if(!file) return;
+  const link = document.createElement('a');
+  link.href = file.url;
+  link.download = file.name;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.click();
+}
+
+function previewMedia(url, type){
+  if(String(type).startsWith('image/')) showImage(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+function openMediaPicker(){
+  pendingPickedMedia = new Set(selectedLibraryMediaUrls);
+  $('mediaPickerModal').classList.add('open');
+  renderMediaPicker();
+}
+
+function closeMediaPicker(){
+  $('mediaPickerModal').classList.remove('open');
+}
+
+function renderMediaPicker(){
+  const keyword = $('mediaPickerSearch').value.toLowerCase().trim();
+  const files = mediaLibrary.files.filter(file => `${file.name} ${file.folder}`.toLowerCase().includes(keyword));
+  if(!files.length){
+    $('mediaPickerGrid').innerHTML = '<div class="empty-mini">Chưa có tài nguyên phù hợp</div>';
+    return;
+  }
+  $('mediaPickerGrid').innerHTML = files.map(file => `
+    <article class="media-card picker ${pendingPickedMedia.has(file.url) ? 'is-picked' : ''}" onclick="togglePickedMedia('${escapeJs(file.url)}')">
+      <div class="media-preview">${renderMediaThumb(file)}</div>
+      <div class="media-info">
+        <b>${escapeHtml(file.name)}</b>
+        <span>${escapeHtml(file.folder)}</span>
+      </div>
+    </article>
+  `).join('');
+}
+
+function togglePickedMedia(url){
+  if(pendingPickedMedia.has(url)) pendingPickedMedia.delete(url);
+  else pendingPickedMedia.add(url);
+  renderMediaPicker();
+}
+
+function usePickedMedia(){
+  selectedLibraryMediaUrls = Array.from(pendingPickedMedia);
+  renderPickedMedia();
+  closeMediaPicker();
+}
+
+function renderPickedMedia(){
+  const wrap = $('pickedMediaWrap');
+  if(!wrap) return;
+  if(!selectedLibraryMediaUrls.length){
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = selectedLibraryMediaUrls.map(url => `
+    <span>
+      ${escapeHtml(mediaNameByUrl(url))}
+      <button type="button" onclick="removePickedMedia('${escapeJs(url)}')">×</button>
+    </span>
+  `).join('');
+}
+
+function removePickedMedia(url){
+  selectedLibraryMediaUrls = selectedLibraryMediaUrls.filter(item => item !== url);
+  renderPickedMedia();
+}
+
+function mediaNameByUrl(url){
+  const file = mediaLibrary.files.find(item => item.url === url);
+  return file ? file.name : 'Media Library';
 }
 
 function toNumber(value){
@@ -906,6 +1304,8 @@ function clearForm(){
   editingImageUrls = [];
   editingMediaUrls = [];
   editingThumbnailUrl = '';
+  selectedLibraryMediaUrls = [];
+  pendingPickedMedia = new Set();
   $('modalTitle').innerText = 'Tạo bài mới';
   setPlatformChecks('Facebook');
   setShowroomChecks('HO');
@@ -913,14 +1313,11 @@ function clearForm(){
   $('postDate').value = '';
   $('postTime').value = '';
   $('postStatus').value = 'Ý tưởng';
-  $('postLink').value = '';
-  $('owner').value = '';
-  $('hashtags').value = '';
   $('note').value = '';
-  $('content').value = '';
   $('imageInput').value = '';
   $('thumbnailInput').value = '';
   $('previewWrap').innerHTML = '';
+  renderPickedMedia();
 }
 
 function previewImages(){
@@ -982,6 +1379,10 @@ async function savePost(){
       mediaUrls = await uploadFiles(files, 'posts');
       imageUrls = mediaUrls.filter(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url));
     }
+    if(selectedLibraryMediaUrls.length){
+      mediaUrls = [...mediaUrls, ...selectedLibraryMediaUrls];
+      imageUrls = [...imageUrls, ...selectedLibraryMediaUrls.filter(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url))];
+    }
     const thumbnail = $('thumbnailInput').files && $('thumbnailInput').files[0];
     if(thumbnail){ thumbnailUrl = await uploadFile(thumbnail, 'thumbnails'); }
 
@@ -992,11 +1393,7 @@ async function savePost(){
       post_date: $('postDate').value || null,
       post_time: $('postTime').value || null,
       status: $('postStatus').value,
-      post_link: $('postLink').value.trim(),
-      owner: $('owner').value.trim(),
-      hashtags: $('hashtags').value.trim(),
       note: $('note').value.trim(),
-      content: $('content').value.trim(),
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
       media_urls: mediaUrls,
@@ -1059,6 +1456,8 @@ function editPost(id){
   editingImageUrls = getImageUrls(p);
   editingMediaUrls = getMediaUrls(p);
   editingThumbnailUrl = p.thumbnail_url || '';
+  selectedLibraryMediaUrls = [];
+  pendingPickedMedia = new Set();
   $('modalTitle').innerText = 'Sửa bài đăng';
   setPlatformChecks(p.platform || 'Facebook');
   setShowroomChecks(p.showroom || 'HO');
@@ -1066,14 +1465,11 @@ function editPost(id){
   $('postDate').value = p.post_date || '';
   $('postTime').value = p.post_time || '';
   $('postStatus').value = p.status || 'Ý tưởng';
-  $('postLink').value = p.post_link || '';
-  $('owner').value = p.owner || '';
-  $('hashtags').value = p.hashtags || '';
   $('note').value = p.note || '';
-  $('content').value = p.content || '';
   $('imageInput').value = '';
   $('thumbnailInput').value = '';
   renderExistingPreview(editingMediaUrls);
+  renderPickedMedia();
   $('postModal').classList.add('open');
 }
 

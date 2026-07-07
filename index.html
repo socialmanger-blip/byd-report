@@ -20,6 +20,8 @@
       <button class="nav" data-platform="Zalo OA">Zalo OA</button>
       <button class="nav" data-platform="YouTube">YouTube</button>
       <button class="nav" data-platform="Google Maps">Google Maps</button>
+      <div class="nav-title">Kho tài nguyên</div>
+      <button class="library-nav" id="btnOpenMediaLibrary">Media Library</button>
       <div class="nav-title">Showroom</div>
       <button class="showroom-nav active" data-showroom="all">Tất cả showroom</button>
       <button class="showroom-nav" data-showroom="HO">Trụ sở chính</button>
@@ -90,7 +92,7 @@
         <div class="section-title">
           <div>
             <h3>SHOWROOM BYD KHU VỰC MEKONG</h3>
-            <p>Báo cáo lượt đánh giá, mục tiêu và hình ảnh Google Maps của từng showroom.</p>
+            <p>Báo cáo 06 Google Business: Trụ sở chính và 5 showroom.</p>
           </div>
           <button type="button" class="detail-link" id="btnResetGoogleReport">Đặt lại</button>
         </div>
@@ -113,11 +115,31 @@
         <div class="account-grid" id="channelAccountGrid"></div>
       </section>
 
+      <section class="media-library" id="mediaLibrary">
+        <div class="section-title">
+          <div>
+            <h3>Media Library</h3>
+            <p>Kho tài nguyên tập trung cho thiết kế, marketing và tái sử dụng khi tạo bài.</p>
+          </div>
+          <button type="button" class="primary" id="btnCreateMediaFolder">+ Tạo thư mục</button>
+        </div>
+        <div class="media-toolbar">
+          <input id="mediaSearch" placeholder="Tìm tên tệp hoặc thư mục..." />
+          <select id="mediaFolderFilter"></select>
+          <button id="btnMediaUpload">Upload tệp</button>
+          <input id="mediaUploadInput" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" hidden />
+        </div>
+        <div class="media-drop" id="mediaDropZone">Kéo thả tệp vào đây hoặc bấm để upload</div>
+        <div class="media-layout">
+          <aside class="media-tree" id="mediaFolderTree"></aside>
+          <div class="media-grid" id="mediaGrid"></div>
+        </div>
+      </section>
+
       <section class="toolbar post-content">
         <input id="searchInput" placeholder="Tìm bài đăng..." />
-        <input id="ownerFilter" placeholder="Người phụ trách" />
         <select id="yearFilter">
-          <option value="all">Tất cả năm</option>
+          <option value="all">Năm</option>
         </select>
         <select id="statusFilter">
           <option value="all">Tất cả trạng thái</option>
@@ -145,13 +167,12 @@
               <th>Tiêu đề</th>
               <th>Ngày đăng</th>
               <th>Trạng thái</th>
-              <th>Người phụ trách</th>
               <th>Ghi chú</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody id="postTable">
-            <tr><td colspan="9" class="empty">Đang tải dữ liệu...</td></tr>
+            <tr><td colspan="8" class="empty">Đang tải dữ liệu...</td></tr>
           </tbody>
         </table>
       </div>
@@ -201,24 +222,14 @@
         <option>Đã đăng</option>
       </select>
 
-      <label>Link bài đã đăng</label>
-      <input id="postLink" placeholder="https://..." />
-
-      <label>Người phụ trách</label>
-      <input id="owner" placeholder="Tên nhân sự phụ trách" />
-
-      <label>Hashtag</label>
-      <input id="hashtags" placeholder="#BYD #BYDNEG" />
-
-      <label>Caption</label>
+      <label>Ghi chú / Caption</label>
       <textarea id="note" placeholder="Caption hiển thị trên kênh..."></textarea>
-
-      <label>Nội dung chi tiết</label>
-      <textarea id="content" placeholder="Nội dung, brief, kịch bản video, ghi chú sản xuất..."></textarea>
 
       <label>Media bài đăng</label>
       <input id="imageInput" type="file" accept="image/*,video/*,.pdf" multiple />
       <small class="field-hint">Có thể upload nhiều ảnh, video, PDF. Ảnh đầu tiên sẽ dùng làm ảnh đại diện trong bảng.</small>
+      <button type="button" id="btnPickMedia" class="ghost-btn">Chọn từ Media Library</button>
+      <div id="pickedMediaWrap" class="picked-media"></div>
 
       <label>Thumbnail</label>
       <input id="thumbnailInput" type="file" accept="image/*" />
@@ -259,6 +270,21 @@
   <div class="image-modal" id="imageModal">
     <button class="close-img" id="btnCloseImage">×</button>
     <img id="bigImage" />
+  </div>
+
+  <div class="modal" id="mediaPickerModal">
+    <div class="modal-box export-box">
+      <div class="modal-head">
+        <h3>Chọn từ Media Library</h3>
+        <button class="icon" id="btnCloseMediaPicker">×</button>
+      </div>
+      <input id="mediaPickerSearch" placeholder="Tìm tài nguyên..." />
+      <div class="media-picker-grid" id="mediaPickerGrid"></div>
+      <div class="modal-actions">
+        <button id="btnCancelMediaPicker">Hủy</button>
+        <button class="primary" id="btnUsePickedMedia">Dùng tài nguyên đã chọn</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
