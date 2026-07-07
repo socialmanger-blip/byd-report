@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SocialHub NEG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>SocialHub</h1>
+      <p>BYD NEG Content Manager</p>
+      <button class="nav active" data-platform="all">Tất cả</button>
+      <button class="nav" data-platform="Facebook">Facebook</button>
+      <button class="nav" data-platform="TikTok">TikTok</button>
+      <button class="nav" data-platform="Zalo OA">Zalo OA</button>
+      <button class="nav" data-platform="YouTube">YouTube</button>
+      <button class="nav" data-platform="Google Maps">Google Maps</button>
+      <div class="nav-title">Showroom</div>
+      <button class="showroom-nav active" data-showroom="all">Tất cả showroom</button>
+      <button class="showroom-nav" data-showroom="HO">HO</button>
+      <button class="showroom-nav" data-showroom="Phú Quốc">Phú Quốc</button>
+      <button class="showroom-nav" data-showroom="Cần Thơ">Cần Thơ</button>
+      <button class="showroom-nav" data-showroom="Kiên Giang">Kiên Giang</button>
+      <button class="showroom-nav" data-showroom="An Giang">An Giang</button>
+      <button class="showroom-nav" data-showroom="Tiền Giang">Tiền Giang</button>
+      <div class="cloud-box"><b>Cloud mode</b><br/>Dữ liệu lưu trên Supabase</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2>Quản lý mạng xã hội</h2>
+          <div id="connectionStatus" class="status-ok">Đang kết nối Supabase...</div>
+        </div>
+        <div class="top-actions">
+          <button id="btnOpenExport">Xuất Excel</button>
+          <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
+        </div>
+      </header>
+
+      <section class="report-head">
+        <div>
+          <h3>Thống kê nội dung</h3>
+          <p>Theo tháng, theo tuần, theo nền tảng và showroom/page.</p>
+        </div>
+        <div class="month-box">
+          <label>Chọn tháng</label>
+          <input id="monthFilter" type="month" />
+        </div>
+      </section>
+
+      <section class="cards report-cards">
+        <div class="card"><b id="totalCount">0</b><span>Tổng bài trong tháng</span></div>
+        <div class="card"><b id="pendingCount">0</b><span>Chờ duyệt</span></div>
+        <div class="card"><b id="doneCount">0</b><span>Đã đăng</span></div>
+        <div class="card"><b id="ideaCount">0</b><span>Ý tưởng</span></div>
+      </section>
+
+      <section class="report-grid">
+        <div class="report-panel">
+          <h4>Theo tuần trong tháng</h4>
+          <div id="weekStats" class="week-stats"></div>
+        </div>
+        <div class="report-panel">
+          <h4>Theo nền tảng</h4>
+          <div id="platformStats" class="mini-stats"></div>
+        </div>
+        <div class="report-panel">
+          <h4>Theo showroom/page</h4>
+          <div id="showroomStats" class="mini-stats"></div>
+        </div>
+      </section>
+
+      <section class="toolbar">
+        <input id="searchInput" placeholder="Tìm bài đăng..." />
+        <select id="statusFilter">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="Ý tưởng">Ý tưởng</option>
+          <option value="Đang làm">Đang làm</option>
+          <option value="Chờ duyệt">Chờ duyệt</option>
+          <option value="Đã đăng">Đã đăng</option>
+        </select>
+        <button id="btnReload">Tải lại</button>
+      </section>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nền tảng</th>
+              <th>Showroom</th>
+              <th>Ảnh</th>
+              <th>Tiêu đề</th>
+              <th>Ngày đăng</th>
+              <th>Trạng thái</th>
+              <th>Ghi chú</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="postTable">
+            <tr><td colspan="8" class="empty">Đang tải dữ liệu...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal" id="postModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="modalTitle">Tạo bài mới</h3>
+        <button class="icon" id="btnCloseModal">×</button>
+      </div>
+
+      <label>Nền tảng sử dụng</label>
+      <div class="showroom-checks platform-checks">
+        <label><input type="checkbox" name="platformCheck" value="Facebook" checked> Facebook</label>
+        <label><input type="checkbox" name="platformCheck" value="TikTok"> TikTok</label>
+        <label><input type="checkbox" name="platformCheck" value="Zalo OA"> Zalo OA</label>
+        <label><input type="checkbox" name="platformCheck" value="YouTube"> YouTube</label>
+        <label><input type="checkbox" name="platformCheck" value="Google Maps"> Google Maps</label>
+      </div>
+
+      <label>Showroom / Page sử dụng</label>
+      <div class="showroom-checks">
+        <label><input type="checkbox" name="showroomCheck" value="HO" checked> HO</label>
+        <label><input type="checkbox" name="showroomCheck" value="Phú Quốc"> Phú Quốc</label>
+        <label><input type="checkbox" name="showroomCheck" value="Cần Thơ"> Cần Thơ</label>
+        <label><input type="checkbox" name="showroomCheck" value="Kiên Giang"> Kiên Giang</label>
+        <label><input type="checkbox" name="showroomCheck" value="An Giang"> An Giang</label>
+        <label><input type="checkbox" name="showroomCheck" value="Tiền Giang"> Tiền Giang</label>
+      </div>
+
+      <label>Tiêu đề</label>
+      <input id="title" placeholder="Ví dụ: BYD M6 ưu đãi tháng 7" />
+
+      <label>Ngày đăng</label>
+      <input id="postDate" type="date" />
+
+      <label>Trạng thái</label>
+      <select id="postStatus">
+        <option>Ý tưởng</option>
+        <option>Đang làm</option>
+        <option>Chờ duyệt</option>
+        <option>Đã đăng</option>
+      </select>
+
+      <label>Ghi chú / Caption</label>
+      <textarea id="note" placeholder="Caption, link Canva, link Drive, yêu cầu chỉnh sửa..."></textarea>
+
+      <label>Ảnh bài đăng</label>
+      <input id="imageInput" type="file" accept="image/*" multiple />
+      <div id="previewWrap" class="preview-wrap"></div>
+
+      <div class="modal-actions">
+        <button id="btnCancel">Hủy</button>
+        <button class="primary" id="btnSave">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="exportModal">
+    <div class="modal-box export-box">
+      <div class="modal-head">
+        <h3>Xuất Excel</h3>
+        <button class="icon" id="btnCloseExport">×</button>
+      </div>
+
+      <label>Phạm vi dữ liệu</label>
+      <select id="exportScope">
+        <option value="filtered">Dữ liệu đang lọc trên màn hình</option>
+        <option value="month">Toàn bộ dữ liệu trong tháng đang chọn</option>
+        <option value="all">Toàn bộ dữ liệu</option>
+      </select>
+
+      <label>Chọn trường và sắp xếp thứ tự cột</label>
+      <div id="exportFieldList" class="export-fields"></div>
+
+      <div class="modal-actions">
+        <button id="btnResetExportFields">Mặc định</button>
+        <button id="btnCancelExport">Hủy</button>
+        <button class="primary" id="btnExportExcel">Xuất file Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="image-modal" id="imageModal">
+    <button class="close-img" id="btnCloseImage">×</button>
+    <img id="bigImage" />
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
