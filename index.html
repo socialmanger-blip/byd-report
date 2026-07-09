@@ -72,10 +72,10 @@
           <span>BYD NEG Power BI View</span>
         </div>
         <div class="bi-tabs">
-          <button class="active">Overview</button>
-          <button>Platform Performance</button>
-          <button>Showroom Analysis</button>
-          <button>Monthly Trends</button>
+          <button class="active" data-bi-view="overview">Overview</button>
+          <button data-bi-view="platform">Platform Performance</button>
+          <button data-bi-view="showroom">Showroom Analysis</button>
+          <button data-bi-view="monthly">Monthly Trends</button>
         </div>
         <div class="bi-layout">
           <aside class="bi-filter-pane">
@@ -128,19 +128,19 @@
             </section>
 
             <section class="report-grid">
-              <div class="report-panel panel-wide">
+              <div class="report-panel panel-wide" data-bi-panel="overview monthly">
                 <h4>Total Posts by Week</h4>
                 <div id="weekStats" class="week-stats"></div>
               </div>
-              <div class="report-panel">
+              <div class="report-panel" data-bi-panel="overview platform">
                 <h4># of Post by Platform</h4>
                 <div id="platformStats" class="mini-stats"></div>
               </div>
-              <div class="report-panel">
+              <div class="report-panel" data-bi-panel="overview showroom">
                 <h4># of Post by Showroom</h4>
                 <div id="showroomStats" class="mini-stats"></div>
               </div>
-              <div class="report-panel panel-trend">
+              <div class="report-panel panel-trend" data-bi-panel="overview monthly">
                 <h4># of Post by Day</h4>
                 <div id="dailyTrend" class="daily-trend"></div>
               </div>

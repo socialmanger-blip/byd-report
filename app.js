@@ -1,6 +1,7 @@
 let posts = [];
 let currentPlatform = 'all';
 let currentShowroom = 'all';
+let currentBiView = 'overview';
 let editingId = null;
 let editingImageUrls = [];
 let editingMediaUrls = [];
@@ -202,6 +203,9 @@ function bindEvents(){
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('imageInput').addEventListener('change', previewImages);
+  document.querySelectorAll('[data-bi-view]').forEach(button => {
+    button.addEventListener('click', () => setBiView(button.dataset.biView));
+  });
   setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -224,6 +228,22 @@ function bindEvents(){
       currentPlatform = 'all';
       renderPosts();
     });
+  });
+}
+
+function setBiView(view = 'overview'){
+  currentBiView = view;
+  const dashboard = document.querySelector('.bi-dashboard');
+  if(dashboard){
+    dashboard.classList.remove('view-overview', 'view-platform', 'view-showroom', 'view-monthly');
+    dashboard.classList.add(`view-${view}`);
+  }
+  document.querySelectorAll('[data-bi-view]').forEach(button => {
+    button.classList.toggle('active', button.dataset.biView === view);
+  });
+  document.querySelectorAll('[data-bi-panel]').forEach(panel => {
+    const views = String(panel.dataset.biPanel || '').split(' ');
+    panel.classList.toggle('is-hidden', view !== 'overview' && !views.includes(view));
   });
 }
 
@@ -376,10 +396,7 @@ function renderPosts(){
 }
 
 function updateReportPanels(){
-  const platformPanel = $('platformStats') ? $('platformStats').closest('.report-panel') : null;
-  if(platformPanel){
-    platformPanel.classList.toggle('is-hidden', currentPlatform !== 'all' && currentShowroom === 'all');
-  }
+  setBiView(currentBiView);
 }
 
 function renderRowActions(post){
