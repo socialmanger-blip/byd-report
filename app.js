@@ -695,6 +695,7 @@ function renderGoogleMapShowrooms(){
           ${image}
           <input type="file" accept="image/*" data-google-field="image" data-google-index="${index}">
         </label>
+        ${showroom.image ? `<button type="button" class="clear-google-photo" onclick="clearGoogleShowroomImage(${index})">Xóa ảnh</button>` : ''}
         <div class="google-body">
           <div class="google-topline">
             <span class="service-badge">${escapeHtml(showroom.type || '')}</span>
@@ -732,6 +733,14 @@ function bindGoogleMapInputs(){
   document.querySelectorAll('[data-google-field]').forEach(input => {
     input.addEventListener('change', handleGoogleMapInput);
   });
+}
+
+function clearGoogleShowroomImage(index){
+  if(!googleMapShowrooms[index]) return;
+  if(!confirm('Xóa ảnh của Google Business này?')) return;
+  googleMapShowrooms[index].image = '';
+  saveGoogleMapShowrooms();
+  renderGoogleMapShowrooms();
 }
 
 async function handleGoogleMapInput(event){
@@ -796,9 +805,14 @@ function loadGoogleMapShowrooms(){
 
 function mergeGoogleMapDefaults(saved){
   const existing = Array.isArray(saved) ? saved : [];
+  const existingByKey = existing.reduce((acc, item) => {
+    const key = showroomKeyFromGoogleName(item.name || '');
+    if(key && !acc[key]) acc[key] = item;
+    return acc;
+  }, {});
   const merged = defaultGoogleMapShowrooms.map(defaultItem => {
     const key = showroomKeyFromGoogleName(defaultItem.name);
-    const found = existing.find(item => showroomKeyFromGoogleName(item.name || '') === key);
+    const found = existingByKey[key];
     return found ? {
       ...defaultItem,
       reviews: found.reviews || 0,
@@ -811,13 +825,23 @@ function mergeGoogleMapDefaults(saved){
 }
 
 function showroomKeyFromGoogleName(name){
-  if(name.includes('TRỤ SỞ') || name.includes('Trụ sở') || name.includes('Việt Nam')) return 'Trụ sở chính';
-  if(name.includes('Phú Quốc')) return 'Phú Quốc';
-  if(name.includes('Cần Thơ')) return 'Cần Thơ';
-  if(name.includes('Kiên Giang')) return 'Kiên Giang';
-  if(name.includes('An Giang')) return 'An Giang';
-  if(name.includes('Tiền Giang')) return 'Tiền Giang';
+  const normalized = normalizeText(name);
+  if(normalized.includes('tru so') || normalized.includes('viet nam')) return 'Trụ sở chính';
+  if(normalized.includes('phu quoc')) return 'Phú Quốc';
+  if(normalized.includes('can tho')) return 'Cần Thơ';
+  if(normalized.includes('kien giang')) return 'Kiên Giang';
+  if(normalized.includes('an giang')) return 'An Giang';
+  if(normalized.includes('tien giang')) return 'Tiền Giang';
   return 'Trụ sở chính';
+}
+
+function normalizeText(text){
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
 }
 
 function saveGoogleMapShowrooms(){
