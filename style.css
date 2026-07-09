@@ -1583,3 +1583,385 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Power BI-style dashboard layer */
+:root {
+  --bi-bg: #eef2f7;
+  --bi-card: #ffffff;
+  --bi-ink: #111827;
+  --bi-muted: #64748b;
+  --bi-border: #dbe4ef;
+  --bi-blue: #2563eb;
+  --bi-cyan: #0891b2;
+  --bi-green: #16a34a;
+  --bi-yellow: #ca8a04;
+  --bi-red: #dc2626;
+  --bi-purple: #7c3aed;
+}
+
+body {
+  background: linear-gradient(180deg, #f8fafc 0, var(--bi-bg) 280px), var(--bi-bg);
+}
+
+.sidebar {
+  background: #0b1220;
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+
+.nav,
+.showroom-nav,
+.library-nav {
+  border-radius: 8px;
+  background: rgba(148, 163, 184, .12);
+}
+
+.nav.active,
+.showroom-nav.active,
+.library-nav.active,
+.nav:hover,
+.showroom-nav:hover,
+.library-nav:hover {
+  background: #1d4ed8;
+  box-shadow: inset 4px 0 0 #facc15, 0 12px 28px rgba(37, 99, 235, .2);
+}
+
+.main {
+  padding: 24px;
+}
+
+.topbar {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--bi-border);
+  border-radius: 10px;
+  background: var(--bi-card);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+}
+
+.topbar h2 {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.status-ok,
+.status-bad {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+}
+
+.status-bad {
+  background: #fef2f2;
+}
+
+.report-head {
+  position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #111827 0%, #1d4ed8 58%, #0891b2 100%);
+  color: #fff;
+}
+
+.report-head::after {
+  content: "";
+  position: absolute;
+  right: 22px;
+  bottom: -42px;
+  width: 220px;
+  height: 220px;
+  border: 32px solid rgba(255,255,255,.12);
+  border-radius: 50%;
+}
+
+.report-head h3 {
+  position: relative;
+  z-index: 1;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.report-head p,
+.report-head label {
+  position: relative;
+  z-index: 1;
+  color: rgba(255,255,255,.76);
+}
+
+.month-box {
+  position: relative;
+  z-index: 1;
+  min-width: 210px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(8px);
+}
+
+.month-box input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.28);
+  background: #fff;
+}
+
+.card,
+.report-panel,
+.toolbar,
+.table-wrap,
+.google-showrooms,
+.channel-accounts,
+.media-library,
+.showroom-dashboard {
+  border-color: var(--bi-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .055);
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  min-height: 118px;
+  padding: 18px 18px 16px;
+  border-top: 5px solid var(--bi-blue);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, .1);
+}
+
+.card:nth-child(2) {
+  border-top-color: var(--bi-yellow);
+}
+
+.card:nth-child(2)::after {
+  background: rgba(202, 138, 4, .12);
+}
+
+.card:nth-child(3) {
+  border-top-color: var(--bi-green);
+}
+
+.card:nth-child(3)::after {
+  background: rgba(22, 163, 74, .12);
+}
+
+.card:nth-child(4) {
+  border-top-color: var(--bi-purple);
+}
+
+.card:nth-child(4)::after {
+  background: rgba(124, 58, 237, .12);
+}
+
+.card b {
+  font-size: 38px;
+  color: var(--bi-ink);
+}
+
+.card span {
+  color: var(--bi-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.report-grid {
+  grid-template-columns: 1.15fr .9fr .95fr;
+}
+
+.report-panel {
+  min-height: 260px;
+  padding: 16px;
+  background: var(--bi-card);
+}
+
+.report-panel h4 {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bi-border);
+  color: #0f172a;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.stat-row {
+  margin: 14px 0;
+}
+
+.stat-label {
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.stat-label b {
+  min-width: 34px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  text-align: center;
+}
+
+.bar {
+  height: 14px;
+  border-radius: 4px;
+  background: #e5e7eb;
+}
+
+.bar i {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bi-blue), var(--bi-cyan));
+}
+
+.stat-row:nth-child(2n) .bar i {
+  background: linear-gradient(90deg, var(--bi-green), #65a30d);
+}
+
+.stat-row:nth-child(3n) .bar i {
+  background: linear-gradient(90deg, var(--bi-yellow), #f97316);
+}
+
+.stat-row:nth-child(4n) .bar i {
+  background: linear-gradient(90deg, var(--bi-purple), #db2777);
+}
+
+.toolbar {
+  position: sticky;
+  top: 10px;
+  z-index: 8;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+}
+
+.toolbar input,
+.toolbar select {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.toolbar button,
+.top-actions > button:first-child,
+.primary {
+  border-radius: 8px;
+}
+
+.table-wrap {
+  background: var(--bi-card);
+}
+
+table {
+  min-width: 1040px;
+}
+
+th {
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+
+td {
+  border-bottom-color: #e8eef6;
+}
+
+tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+tbody tr:hover {
+  background: #eff6ff;
+}
+
+.showroom-dashboard,
+.google-showrooms,
+.channel-accounts,
+.media-library {
+  background: #f8fafc;
+}
+
+.section-title {
+  padding: 2px 0 12px;
+  border-bottom: 1px solid var(--bi-border);
+}
+
+.section-title h3 {
+  font-size: 24px;
+  text-transform: uppercase;
+}
+
+.workspace-kpi div,
+.google-summary-card,
+.account-card,
+.showroom-channel-card,
+.google-card,
+.media-card {
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .055);
+}
+
+.workspace-kpi div {
+  border-left: 5px solid var(--bi-blue);
+}
+
+.workspace-kpi div:nth-child(2n) {
+  border-left-color: var(--bi-green);
+}
+
+.workspace-kpi div:nth-child(3n) {
+  border-left-color: var(--bi-yellow);
+}
+
+.google-summary-card {
+  border-top: 5px solid var(--bi-blue);
+}
+
+.google-summary-card:nth-child(2) {
+  border-top-color: var(--bi-yellow);
+}
+
+.google-summary-card:nth-child(3) {
+  border-top-color: var(--bi-green);
+}
+
+.google-summary-card:nth-child(4) {
+  border-top-color: var(--bi-red);
+}
+
+.progress-track {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.progress-track i {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bi-green), #22c55e);
+}
+
+.status-pill {
+  border-radius: 6px;
+}
+
+.media-drop {
+  border-radius: 10px;
+  background: repeating-linear-gradient(135deg, #fff, #fff 10px, #f8fafc 10px, #f8fafc 20px);
+}
+
+@media (max-width: 900px) {
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    position: static;
+  }
+}

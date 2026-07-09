@@ -1586,8 +1586,8 @@ function renderKeyValueStats(targetId, data){
     return;
   }
   const max = Math.max(...entries.map(x=>x[1]), 1);
-  $(targetId).innerHTML = entries.map(([name, count]) => `
-    <div class="stat-row">
+  $(targetId).innerHTML = entries.map(([name, count], index) => `
+    <div class="stat-row" style="--bar-index:${index}">
       <div class="stat-label"><span>${escapeHtml(name)}</span><b>${count}</b></div>
       <div class="bar"><i style="width:${Math.max(8, Math.round(count/max*100))}%"></i></div>
     </div>
