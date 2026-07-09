@@ -10,6 +10,8 @@ const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
 const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
 const mediaLibraryStorageKey = 'socialhub_media_library_v1';
+const mediaLibraryStorageFolder = 'media-library';
+const importedStorageFolder = 'Media Library/Chưa phân loại';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
@@ -186,6 +188,7 @@ function openMediaLibrary(){
   document.querySelectorAll('.nav,.showroom-nav').forEach(btn => btn.classList.remove('active'));
   $('btnOpenMediaLibrary').classList.add('active');
   $('mediaLibrary').classList.add('is-visible');
+  currentMediaFolder = 'all';
   document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
   renderMediaLibrary();
 }
@@ -1122,6 +1125,7 @@ async function loadMediaLibraryFromSupabase(){
   if(!data || !data.length){
     mediaLibrary = loadMediaLibrary();
     await migrateLocalMediaLibraryToSupabase();
+    await importStorageMediaLibraryFiles();
     return;
   }
   const folders = data
@@ -1143,7 +1147,82 @@ async function loadMediaLibraryFromSupabase(){
     folders: [...new Set([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)])],
     files
   };
+  await importStorageMediaLibraryFiles();
   saveMediaLibrary();
+}
+
+async function importStorageMediaLibraryFiles(){
+  const { data, error } = await supabaseClient.storage
+    .from(BUCKET_NAME)
+    .list(mediaLibraryStorageFolder, {
+      limit: 1000,
+      offset: 0,
+      sortBy: { column: 'created_at', order: 'desc' }
+    });
+  if(error){
+    console.warn('Không quét được file cũ trong Storage:', error);
+    return;
+  }
+  const storageFiles = (data || []).filter(item => item && item.name && !item.name.startsWith('.'));
+  if(!storageFiles.length) return;
+
+  if(!mediaLibrary.folders.includes(importedStorageFolder)){
+    mediaLibrary.folders.push(importedStorageFolder);
+  }
+
+  const existingUrls = new Set((mediaLibrary.files || []).map(file => file.url).filter(Boolean));
+  const existingNames = new Set((mediaLibrary.files || []).map(file => file.name).filter(Boolean));
+  const rows = [];
+  storageFiles.forEach(item => {
+    const storagePath = `${mediaLibraryStorageFolder}/${item.name}`;
+    const { data: publicData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(storagePath);
+    const url = publicData && publicData.publicUrl ? publicData.publicUrl : '';
+    if(!url || existingUrls.has(url) || existingNames.has(item.name)) return;
+    rows.push({
+      name: item.name,
+      folder: importedStorageFolder,
+      url,
+      type: guessMediaType(item.name, item.metadata && item.metadata.mimetype),
+      size: toNumber(item.metadata && item.metadata.size),
+      uploaded_at: item.created_at || item.updated_at || new Date().toISOString()
+    });
+  });
+  if(!rows.length){
+    saveMediaLibrary();
+    return;
+  }
+  const { data: inserted, error: insertError } = await supabaseClient
+    .from('media_library')
+    .insert(rows)
+    .select('*');
+  if(insertError){
+    console.warn('Không nhập được file Storage vào Media Library:', insertError);
+    return;
+  }
+  (inserted || []).forEach(row => {
+    mediaLibrary.files.unshift({
+      id: row.id,
+      name: row.name || 'Tệp chưa đặt tên',
+      folder: row.folder || importedStorageFolder,
+      url: row.url || '',
+      type: row.type || 'application/octet-stream',
+      size: toNumber(row.size),
+      uploadedAt: row.uploaded_at || new Date().toISOString()
+    });
+  });
+  saveMediaLibrary();
+}
+
+function guessMediaType(name, fallback){
+  if(fallback) return fallback;
+  const extension = String(name || '').split('.').pop().toLowerCase();
+  if(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'].includes(extension)) return `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+  if(['mp4', 'mov', 'webm', 'm4v'].includes(extension)) return `video/${extension === 'mov' ? 'quicktime' : extension}`;
+  if(extension === 'pdf') return 'application/pdf';
+  if(['doc', 'docx'].includes(extension)) return 'application/msword';
+  if(['xls', 'xlsx'].includes(extension)) return 'application/vnd.ms-excel';
+  if(['ppt', 'pptx'].includes(extension)) return 'application/vnd.ms-powerpoint';
+  return 'application/octet-stream';
 }
 
 async function migrateLocalMediaLibraryToSupabase(){
@@ -1326,7 +1405,7 @@ async function uploadMediaLibraryFiles(files){
   try{
     $('mediaDropZone').innerText = `Đang upload ${files.length} tệp...`;
     for(const file of files){
-      const url = await uploadFile(file, 'media-library');
+      const url = await uploadFile(file, mediaLibraryStorageFolder);
       const row = {
         name: file.name,
         folder,
