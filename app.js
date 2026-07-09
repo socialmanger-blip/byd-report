@@ -1257,12 +1257,12 @@ function renderMediaFolders(){
 function renderPostMediaFolderOptions(){
   const select = $('postMediaFolder');
   if(!select) return;
-  const selected = select.value || 'Tài liệu khác/Tài liệu nội bộ';
+  const selected = select.value || '';
   const folders = [...new Set(mediaLibrary.folders || [])];
-  select.innerHTML = folders.map(folder => `
+  select.innerHTML = '<option value="">Không lưu vào Media Library</option>' + folders.map(folder => `
     <option value="${escapeHtml(folder)}" ${folder === selected ? 'selected' : ''}>${escapeHtml(folder)}</option>
   `).join('');
-  if(folders.includes(selected)) select.value = selected;
+  select.value = folders.includes(selected) ? selected : '';
 }
 
 function selectMediaFolder(folder){
@@ -1352,9 +1352,10 @@ async function uploadMediaLibraryFiles(files){
 }
 
 async function uploadPostFilesToMediaLibrary(files){
-  const folder = $('postMediaFolder') && $('postMediaFolder').value
-    ? $('postMediaFolder').value
-    : (mediaLibrary.folders[0] || 'Tài liệu khác/Tài liệu nội bộ');
+  const folder = $('postMediaFolder') ? $('postMediaFolder').value : '';
+  if(!folder){
+    return uploadFiles(files, 'posts');
+  }
   const urls = [];
   for(const file of files){
     const saved = await uploadFileToMediaLibrary(file, folder);

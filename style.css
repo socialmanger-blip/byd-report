@@ -2270,3 +2270,123 @@ tbody tr:hover {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Refined Power BI palette */
+.bi-dashboard {
+  border: 1px solid #8fb8bf;
+  background: #f4f8f9;
+  box-shadow: 0 14px 34px rgba(24, 74, 84, .12);
+}
+
+.bi-titlebar {
+  background: linear-gradient(180deg, #2f6f7a 0%, #1e4f59 100%);
+}
+
+.bi-titlebar h3 {
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.bi-tabs {
+  background: #224f59;
+}
+
+.bi-tabs button {
+  color: #d8eef1;
+}
+
+.bi-tabs button.active {
+  background: #ffffff;
+  color: #12343b;
+  box-shadow: inset 0 -3px 0 #2f6f7a;
+}
+
+.bi-filter-pane {
+  border-color: #bfd6da;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7);
+}
+
+.filter-card {
+  border: 1px solid #d6e5e8;
+  background: #eef6f7;
+  color: #17343b;
+}
+
+.filter-card label {
+  color: #315a62;
+}
+
+.filter-card input,
+.filter-card select {
+  border-color: #c8dadd;
+  border-radius: 6px;
+}
+
+.bi-filter-actions button {
+  background: #244f58;
+}
+
+.bi-filter-actions button:last-child {
+  background: #2f6f7a;
+}
+
+.bi-dashboard .card {
+  border-color: #c9dde1;
+  border-left-color: #2f6f7a;
+  background: linear-gradient(180deg, #ffffff, #fbfdfe);
+  box-shadow: 0 6px 16px rgba(31, 79, 89, .09);
+}
+
+.bi-dashboard .card:nth-child(2) {
+  border-left-color: #2f7d5b;
+}
+
+.bi-dashboard .card:nth-child(3) {
+  border-left-color: #b7791f;
+}
+
+.bi-dashboard .card:nth-child(4) {
+  border-left-color: #6b7280;
+}
+
+.bi-dashboard .card:nth-child(5) {
+  border-left-color: #2563eb;
+}
+
+.bi-dashboard .card b {
+  color: #285e67;
+}
+
+.bi-dashboard .card span {
+  color: #5d747a;
+}
+
+.bi-dashboard .report-panel {
+  border-color: #c9dde1;
+  background: #ffffff;
+  box-shadow: 0 7px 18px rgba(31, 79, 89, .08);
+}
+
+.bi-dashboard .report-panel h4 {
+  color: #17343b;
+}
+
+.bi-dashboard .bar {
+  background: repeating-linear-gradient(90deg, #eef4f6, #eef4f6 1px, #fff 1px, #fff 52px);
+}
+
+.bi-dashboard .bar i,
+.bi-dashboard .stat-row:nth-child(2n) .bar i,
+.bi-dashboard .stat-row:nth-child(3n) .bar i,
+.bi-dashboard .stat-row:nth-child(4n) .bar i {
+  background: #4f8e98;
+}
+
+.trend-column i {
+  background: linear-gradient(180deg, #7fb8c0, #4f8e98);
+}
+
+.modal-box .sub-label {
+  color: #315a62;
+}
