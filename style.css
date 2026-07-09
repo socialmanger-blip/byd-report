@@ -1965,3 +1965,302 @@ tbody tr:hover {
     position: static;
   }
 }
+
+/* Power BI report layout */
+.bi-dashboard {
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 2px solid #6ba8ae;
+  border-radius: 22px;
+  background: #f7fbfb;
+  box-shadow: 0 18px 45px rgba(32, 89, 96, .16);
+}
+
+.bi-titlebar {
+  display: grid;
+  place-items: center;
+  min-height: 54px;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, #4e9099 0%, #1f4f58 100%);
+  color: #fff;
+  text-align: center;
+}
+
+.bi-titlebar h3 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 900;
+}
+
+.bi-titlebar span {
+  margin-top: 3px;
+  color: rgba(255,255,255,.78);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.bi-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0 220px 0 220px;
+  background: linear-gradient(180deg, #1f4f58, #173f46);
+}
+
+.bi-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #e8f6f8;
+  font-weight: 900;
+  cursor: default;
+}
+
+.bi-tabs button.active {
+  background: #ffffff;
+  color: #111827;
+}
+
+.bi-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
+}
+
+.bi-filter-pane {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #9cc8cd;
+  border-radius: 14px;
+  background: #f8ffff;
+}
+
+.filter-card {
+  padding: 10px;
+  border-radius: 9px;
+  background: #5b98a1;
+  color: #fff;
+}
+
+.filter-card label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.filter-card input,
+.filter-card select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #d9ebee;
+  border-radius: 3px;
+  background: #fff;
+  color: #111827;
+  padding: 7px 9px;
+  font-size: 13px;
+}
+
+.bi-filter-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bi-filter-actions button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #1f4f58;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.bi-filter-actions button:last-child {
+  background: #1f7aff;
+}
+
+.bi-canvas {
+  min-width: 0;
+}
+
+.bi-dashboard .cards {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.bi-dashboard .card {
+  min-height: 80px;
+  padding: 12px 14px;
+  border: 1px solid #80aeb4;
+  border-left: 8px solid #5b98a1;
+  border-top: 1px solid #80aeb4;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(47, 95, 104, .12);
+}
+
+.bi-dashboard .card::after {
+  display: none;
+}
+
+.bi-dashboard .card b {
+  display: block;
+  color: #4e7f87;
+  font-size: 30px;
+  line-height: 1;
+  text-align: center;
+}
+
+.bi-dashboard .card span {
+  display: block;
+  margin-top: 7px;
+  color: #5e7b80;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.bi-dashboard .report-grid {
+  display: grid;
+  grid-template-columns: 1.15fr .95fr 1fr;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.bi-dashboard .report-panel {
+  min-height: 250px;
+  padding: 12px 14px;
+  border: 1px solid #9cc8cd;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(47, 95, 104, .11);
+}
+
+.bi-dashboard .report-panel h4 {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  color: #111827;
+  font-size: 14px;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.bi-dashboard .panel-wide {
+  min-height: 286px;
+}
+
+.bi-dashboard .panel-trend {
+  grid-column: 1 / -1;
+  min-height: 160px;
+}
+
+.bi-dashboard .bar {
+  height: 22px;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, #eef3f4, #eef3f4 1px, #fff 1px, #fff 48px);
+}
+
+.bi-dashboard .bar i {
+  border-radius: 0;
+  background: #5b98a1;
+}
+
+.bi-dashboard .stat-row:nth-child(2n) .bar i,
+.bi-dashboard .stat-row:nth-child(3n) .bar i,
+.bi-dashboard .stat-row:nth-child(4n) .bar i {
+  background: #5b98a1;
+}
+
+.bi-dashboard .stat-label {
+  margin-bottom: 5px;
+  color: #111827;
+  font-size: 12px;
+}
+
+.bi-dashboard .stat-label b {
+  background: transparent;
+  color: #111827;
+}
+
+.daily-trend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(34px, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 110px;
+  padding: 10px 8px 0;
+  border-top: 1px dashed #d7e5e7;
+}
+
+.trend-column {
+  display: grid;
+  grid-template-rows: 20px 1fr 18px;
+  align-items: end;
+  min-height: 100px;
+  text-align: center;
+}
+
+.trend-column i {
+  display: block;
+  width: 100%;
+  min-height: 4px;
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(180deg, #76b6be, #5b98a1);
+}
+
+.trend-value {
+  color: #111827;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.trend-column b {
+  color: #111827;
+  font-size: 11px;
+}
+
+.bi-dashboard + .showroom-dashboard,
+.bi-dashboard ~ .table-wrap {
+  border-radius: 12px;
+}
+
+@media (max-width: 1180px) {
+  .bi-tabs {
+    padding: 0;
+  }
+
+  .bi-dashboard .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bi-dashboard .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bi-dashboard .panel-trend {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .bi-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bi-tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+}

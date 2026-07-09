@@ -117,6 +117,7 @@ function bindEvents(){
   $('btnSave').addEventListener('click', savePost);
   $('btnReload').addEventListener('click', loadPosts);
   $('btnOpenExport').addEventListener('click', openExportModal);
+  $('btnOpenExportTop').addEventListener('click', openExportModal);
   $('btnCloseExport').addEventListener('click', closeExportModal);
   $('btnCancelExport').addEventListener('click', closeExportModal);
   $('btnExportExcel').addEventListener('click', exportExcel);
@@ -1596,10 +1597,14 @@ function renderKeyValueStats(targetId, data){
 
 function updateStats(){
   const monthPosts = getMonthPosts();
+  const done = monthPosts.filter(p => p.status === 'Đã đăng').length;
+  const pending = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
+  const idea = monthPosts.filter(p => p.status === 'Ý tưởng').length;
   $('totalCount').innerText = monthPosts.length;
-  $('pendingCount').innerText = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
-  $('doneCount').innerText = monthPosts.filter(p => p.status === 'Đã đăng').length;
-  $('ideaCount').innerText = monthPosts.filter(p => p.status === 'Ý tưởng').length;
+  $('pendingCount').innerText = pending;
+  $('doneCount').innerText = done;
+  $('ideaCount').innerText = idea;
+  if($('doneRate')) $('doneRate').innerText = monthPosts.length ? `${Math.round(done / monthPosts.length * 100)}%` : '0%';
 
   const weeks = { 'Tuần 1':0, 'Tuần 2':0, 'Tuần 3':0, 'Tuần 4':0, 'Tuần 5':0 };
   monthPosts.forEach(p => {
@@ -1610,6 +1615,34 @@ function updateStats(){
 
   renderKeyValueStats('platformStats', countBy(monthPosts, p => platformList(p.platform || 'Khác')));
   renderKeyValueStats('showroomStats', countBy(monthPosts, p => showroomList(p.showroom || 'Chưa chọn')));
+  renderDailyTrend(monthPosts);
+}
+
+function renderDailyTrend(monthPosts){
+  const target = $('dailyTrend');
+  if(!target) return;
+  const selectedMonth = $('monthFilter').value;
+  const daysInMonth = selectedMonth
+    ? new Date(Number(selectedMonth.slice(0,4)), Number(selectedMonth.slice(5,7)), 0).getDate()
+    : 31;
+  const dayCounts = Array.from({ length: daysInMonth }, (_, index) => ({
+    day: index + 1,
+    count: 0
+  }));
+  monthPosts.forEach(post => {
+    const day = Number(String(post.post_date || '').slice(8,10));
+    if(dayCounts[day - 1]) dayCounts[day - 1].count += 1;
+  });
+  const visible = dayCounts.filter(item => item.count > 0);
+  const series = visible.length ? visible : dayCounts.slice(0, Math.min(daysInMonth, 12));
+  const max = Math.max(...series.map(item => item.count), 1);
+  target.innerHTML = series.map(item => `
+    <div class="trend-column">
+      <span class="trend-value">${item.count}</span>
+      <i style="height:${Math.max(8, Math.round(item.count / max * 100))}%"></i>
+      <b>${item.day}</b>
+    </div>
+  `).join('');
 }
 
 function openModal(preset = {}){

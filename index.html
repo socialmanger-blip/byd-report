@@ -40,41 +40,91 @@
           <div id="connectionStatus" class="status-ok">Đang kết nối Supabase...</div>
         </div>
         <div class="top-actions post-content">
-          <button id="btnOpenExport">Xuất Excel</button>
+          <button id="btnOpenExportTop">Xuất Excel</button>
           <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
         </div>
       </header>
 
-      <section class="report-head post-content">
-        <div>
-          <h3>Executive Dashboard</h3>
-          <p>Tổng quan nội dung, tiến độ đăng bài và hiệu suất theo showroom/nền tảng.</p>
+      <section class="bi-dashboard post-content">
+        <div class="bi-titlebar">
+          <h3>Social Media Performance Dashboard</h3>
+          <span>BYD NEG Power BI View</span>
         </div>
-        <div class="month-box">
-          <label>Chọn tháng</label>
-          <input id="monthFilter" type="month" />
+        <div class="bi-tabs">
+          <button class="active">Overview</button>
+          <button>Platform Performance</button>
+          <button>Showroom Analysis</button>
+          <button>Monthly Trends</button>
         </div>
-      </section>
+        <div class="bi-layout">
+          <aside class="bi-filter-pane">
+            <div class="filter-card">
+              <label>Tháng</label>
+              <input id="monthFilter" type="month" />
+            </div>
+            <div class="filter-card">
+              <label>Từ khóa</label>
+              <input id="searchInput" placeholder="Tìm bài đăng..." />
+            </div>
+            <div class="filter-card">
+              <label>Năm</label>
+              <select id="yearFilter">
+                <option value="all">Tất cả</option>
+              </select>
+            </div>
+            <div class="filter-card">
+              <label>Trạng thái</label>
+              <select id="statusFilter">
+                <option value="all">Tất cả</option>
+                <option value="Ý tưởng">Ý tưởng</option>
+                <option value="Đang làm">Đang làm</option>
+                <option value="Chờ duyệt">Chờ duyệt</option>
+                <option value="Đã đăng">Đã đăng</option>
+              </select>
+            </div>
+            <div class="filter-card">
+              <label>Sắp xếp</label>
+              <select id="sortFilter">
+                <option value="date-asc">01 → cuối tháng</option>
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="platform">Theo nền tảng</option>
+              </select>
+            </div>
+            <div class="bi-filter-actions">
+              <button id="btnReload">Tải lại</button>
+              <button id="btnOpenExport">Xuất Excel</button>
+            </div>
+          </aside>
 
-      <section class="cards report-cards post-content">
-        <div class="card"><b id="totalCount">0</b><span>Tổng bài trong tháng</span></div>
-        <div class="card"><b id="pendingCount">0</b><span>Chờ duyệt</span></div>
-        <div class="card"><b id="doneCount">0</b><span>Đã đăng</span></div>
-        <div class="card"><b id="ideaCount">0</b><span>Ý tưởng</span></div>
-      </section>
+          <div class="bi-canvas">
+            <section class="cards report-cards">
+              <div class="card"><b id="totalCount">0</b><span># of Post</span></div>
+              <div class="card"><b id="doneCount">0</b><span>Đã đăng</span></div>
+              <div class="card"><b id="pendingCount">0</b><span>Chờ duyệt</span></div>
+              <div class="card"><b id="ideaCount">0</b><span>Ý tưởng</span></div>
+              <div class="card"><b id="doneRate">0%</b><span>Tỷ lệ hoàn tất</span></div>
+            </section>
 
-      <section class="report-grid post-content">
-        <div class="report-panel">
-          <h4>Theo tuần trong tháng</h4>
-          <div id="weekStats" class="week-stats"></div>
-        </div>
-        <div class="report-panel">
-          <h4>Theo nền tảng</h4>
-          <div id="platformStats" class="mini-stats"></div>
-        </div>
-        <div class="report-panel">
-          <h4>Theo showroom/page</h4>
-          <div id="showroomStats" class="mini-stats"></div>
+            <section class="report-grid">
+              <div class="report-panel panel-wide">
+                <h4>Total Posts by Week</h4>
+                <div id="weekStats" class="week-stats"></div>
+              </div>
+              <div class="report-panel">
+                <h4># of Post by Platform</h4>
+                <div id="platformStats" class="mini-stats"></div>
+              </div>
+              <div class="report-panel">
+                <h4># of Post by Showroom</h4>
+                <div id="showroomStats" class="mini-stats"></div>
+              </div>
+              <div class="report-panel panel-trend">
+                <h4># of Post by Day</h4>
+                <div id="dailyTrend" class="daily-trend"></div>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -134,27 +184,6 @@
           <aside class="media-tree" id="mediaFolderTree"></aside>
           <div class="media-grid" id="mediaGrid"></div>
         </div>
-      </section>
-
-      <section class="toolbar post-content">
-        <input id="searchInput" placeholder="Tìm bài đăng..." />
-        <select id="yearFilter">
-          <option value="all">Năm</option>
-        </select>
-        <select id="statusFilter">
-          <option value="all">Tất cả trạng thái</option>
-          <option value="Ý tưởng">Ý tưởng</option>
-          <option value="Đang làm">Đang làm</option>
-          <option value="Chờ duyệt">Chờ duyệt</option>
-          <option value="Đã đăng">Đã đăng</option>
-        </select>
-        <select id="sortFilter">
-          <option value="date-asc">01 → cuối tháng</option>
-          <option value="newest">Mới nhất</option>
-          <option value="oldest">Cũ nhất</option>
-          <option value="platform">Theo nền tảng</option>
-        </select>
-        <button id="btnReload">Tải lại</button>
       </section>
 
       <div class="table-wrap post-content">
