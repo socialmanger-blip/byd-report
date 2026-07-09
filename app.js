@@ -4,12 +4,12 @@ let currentShowroom = 'all';
 let editingId = null;
 let editingImageUrls = [];
 let editingMediaUrls = [];
-let editingThumbnailUrl = '';
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
 const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
 const mediaLibraryStorageKey = 'socialhub_media_library_v1';
+const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
@@ -145,7 +145,6 @@ function bindEvents(){
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('imageInput').addEventListener('change', previewImages);
-  $('thumbnailInput').addEventListener('change', previewImages);
   setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1236,6 +1235,7 @@ function deleteMediaFileFromSupabase(id){
 function renderMediaLibrary(){
   renderMediaFolders();
   renderMediaFiles();
+  renderPostMediaFolderOptions();
 }
 
 function renderMediaFolders(){
@@ -1252,6 +1252,17 @@ function renderMediaFolders(){
       `}
     </div>
   `).join('');
+}
+
+function renderPostMediaFolderOptions(){
+  const select = $('postMediaFolder');
+  if(!select) return;
+  const selected = select.value || 'Tài liệu khác/Tài liệu nội bộ';
+  const folders = [...new Set(mediaLibrary.folders || [])];
+  select.innerHTML = folders.map(folder => `
+    <option value="${escapeHtml(folder)}" ${folder === selected ? 'selected' : ''}>${escapeHtml(folder)}</option>
+  `).join('');
+  if(folders.includes(selected)) select.value = selected;
 }
 
 function selectMediaFolder(folder){
@@ -1327,26 +1338,7 @@ async function uploadMediaLibraryFiles(files){
   try{
     $('mediaDropZone').innerText = `Đang upload ${files.length} tệp...`;
     for(const file of files){
-      const url = await uploadFile(file, 'media-library');
-      const row = {
-        name: file.name,
-        folder,
-        url,
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        uploaded_at: new Date().toISOString()
-      };
-      const { data, error } = await supabaseClient.from('media_library').insert(row).select('*').single();
-      if(error) throw error;
-      mediaLibrary.files.unshift({
-        id: data.id,
-        name: data.name,
-        folder: data.folder,
-        url: data.url,
-        type: data.type || 'application/octet-stream',
-        size: toNumber(data.size),
-        uploadedAt: data.uploaded_at
-      });
+      await uploadFileToMediaLibrary(file, folder);
     }
     saveMediaLibrary();
     $('mediaUploadInput').value = '';
@@ -1357,6 +1349,49 @@ async function uploadMediaLibraryFiles(files){
     alert('Lỗi upload Media Library: ' + err.message);
     $('mediaDropZone').innerText = 'Kéo và thả tệp vào đây để upload';
   }
+}
+
+async function uploadPostFilesToMediaLibrary(files){
+  const folder = $('postMediaFolder') && $('postMediaFolder').value
+    ? $('postMediaFolder').value
+    : (mediaLibrary.folders[0] || 'Tài liệu khác/Tài liệu nội bộ');
+  const urls = [];
+  for(const file of files){
+    const saved = await uploadFileToMediaLibrary(file, folder);
+    urls.push(saved.url);
+  }
+  saveMediaLibrary();
+  return urls;
+}
+
+async function uploadFileToMediaLibrary(file, folder){
+  if(folder && !mediaLibrary.folders.includes(folder)){
+    mediaLibrary.folders.push(folder);
+    await saveMediaFolderToSupabase(folder);
+  }
+  const url = await uploadFile(file, mediaLibraryStorageFolder);
+  const row = {
+    name: file.name,
+    folder,
+    url,
+    type: file.type || guessMediaType(file.name),
+    size: file.size,
+    uploaded_at: new Date().toISOString()
+  };
+  const { data, error } = await supabaseClient.from('media_library').insert(row).select('*').single();
+  if(error) throw error;
+  const item = {
+    id: data.id,
+    name: data.name,
+    folder: data.folder,
+    url: data.url,
+    type: data.type || 'application/octet-stream',
+    size: toNumber(data.size),
+    uploadedAt: data.uploaded_at
+  };
+  mediaLibrary.files.unshift(item);
+  saveMediaLibrary();
+  return item;
 }
 
 function createMediaFolder(){
@@ -1452,6 +1487,18 @@ function downloadMediaFile(id){
 function previewMedia(url, type){
   if(String(type).startsWith('image/')) showImage(url);
   else window.open(url, '_blank', 'noopener');
+}
+
+function guessMediaType(name, fallback){
+  if(fallback) return fallback;
+  const extension = String(name || '').split('.').pop().toLowerCase();
+  if(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'].includes(extension)) return `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+  if(['mp4', 'mov', 'webm', 'm4v'].includes(extension)) return `video/${extension === 'mov' ? 'quicktime' : extension}`;
+  if(extension === 'pdf') return 'application/pdf';
+  if(['doc', 'docx'].includes(extension)) return 'application/msword';
+  if(['xls', 'xlsx'].includes(extension)) return 'application/vnd.ms-excel';
+  if(['ppt', 'pptx'].includes(extension)) return 'application/vnd.ms-powerpoint';
+  return 'application/octet-stream';
 }
 
 function openMediaPicker(){
@@ -1673,9 +1720,9 @@ function clearForm(){
   editingId = null;
   editingImageUrls = [];
   editingMediaUrls = [];
-  editingThumbnailUrl = '';
   selectedLibraryMediaUrls = [];
   pendingPickedMedia = new Set();
+  renderPostMediaFolderOptions();
   $('modalTitle').innerText = 'Tạo bài mới';
   setPlatformChecks('Facebook');
   setShowroomChecks('HO');
@@ -1685,7 +1732,6 @@ function clearForm(){
   $('postStatus').value = 'Ý tưởng';
   $('note').value = '';
   $('imageInput').value = '';
-  $('thumbnailInput').value = '';
   $('previewWrap').innerHTML = '';
   renderPickedMedia();
 }
@@ -1693,8 +1739,7 @@ function clearForm(){
 function previewImages(){
   const files = Array.from($('imageInput').files || []);
   $('previewWrap').innerHTML = '';
-  const thumbnail = $('thumbnailInput').files && $('thumbnailInput').files[0];
-  if(files.length === 0 && !thumbnail) return;
+  if(files.length === 0) return;
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -1702,20 +1747,10 @@ function previewImages(){
     };
     reader.readAsDataURL(file);
   });
-  if(thumbnail){
-    const reader = new FileReader();
-    reader.onload = e => {
-      const node = createPreviewNode(thumbnail, e.target.result);
-      node.classList.add('is-thumbnail');
-      $('previewWrap').prepend(node);
-    };
-    reader.readAsDataURL(thumbnail);
-  }
 }
 
 function renderExistingPreview(urls){
-  const media = [...(editingThumbnailUrl ? [editingThumbnailUrl] : []), ...urls];
-  $('previewWrap').innerHTML = media.map(url => `<img src="${escapeHtml(url)}" class="preview" style="display:block">`).join('');
+  $('previewWrap').innerHTML = urls.map(url => `<img src="${escapeHtml(url)}" class="preview" style="display:block">`).join('');
 }
 
 function createPreviewNode(file, src){
@@ -1743,18 +1778,15 @@ async function savePost(){
   try{
     let imageUrls = editingImageUrls || [];
     let mediaUrls = editingMediaUrls || [];
-    let thumbnailUrl = editingThumbnailUrl || '';
     const files = Array.from($('imageInput').files || []);
     if(files.length){
-      mediaUrls = await uploadFiles(files, 'posts');
+      mediaUrls = await uploadPostFilesToMediaLibrary(files);
       imageUrls = mediaUrls.filter(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url));
     }
     if(selectedLibraryMediaUrls.length){
       mediaUrls = [...mediaUrls, ...selectedLibraryMediaUrls];
       imageUrls = [...imageUrls, ...selectedLibraryMediaUrls.filter(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url))];
     }
-    const thumbnail = $('thumbnailInput').files && $('thumbnailInput').files[0];
-    if(thumbnail){ thumbnailUrl = await uploadFile(thumbnail, 'thumbnails'); }
 
     const payload = {
       platform: selectedPlatforms.join(', '),
@@ -1767,7 +1799,7 @@ async function savePost(){
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
       media_urls: mediaUrls,
-      thumbnail_url: thumbnailUrl
+      thumbnail_url: ''
     };
 
     let error;
@@ -1825,9 +1857,9 @@ function editPost(id){
   editingId = p.id;
   editingImageUrls = getImageUrls(p);
   editingMediaUrls = getMediaUrls(p);
-  editingThumbnailUrl = p.thumbnail_url || '';
   selectedLibraryMediaUrls = [];
   pendingPickedMedia = new Set();
+  renderPostMediaFolderOptions();
   $('modalTitle').innerText = 'Sửa bài đăng';
   setPlatformChecks(p.platform || 'Facebook');
   setShowroomChecks(p.showroom || 'HO');
@@ -1837,7 +1869,6 @@ function editPost(id){
   $('postStatus').value = p.status || 'Ý tưởng';
   $('note').value = p.note || '';
   $('imageInput').value = '';
-  $('thumbnailInput').value = '';
   renderExistingPreview(editingMediaUrls);
   renderPickedMedia();
   $('postModal').classList.add('open');

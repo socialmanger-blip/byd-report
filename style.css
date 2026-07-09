@@ -1339,6 +1339,12 @@ tbody tr:hover {
   font-weight: 800;
 }
 
+.modal-box .sub-label {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .modal-box input,
 .modal-box select,
 .modal-box textarea {

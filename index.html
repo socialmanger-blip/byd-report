@@ -256,12 +256,11 @@
 
       <label>Media bài đăng</label>
       <input id="imageInput" type="file" accept="image/*,video/*,.pdf" multiple />
-      <small class="field-hint">Có thể upload nhiều ảnh, video, PDF. Ảnh đầu tiên sẽ dùng làm ảnh đại diện trong bảng.</small>
+      <label class="sub-label">Lưu tệp upload vào thư mục Media Library</label>
+      <select id="postMediaFolder"></select>
+      <small class="field-hint">Có thể upload nhiều ảnh, video, PDF. File mới sẽ được lưu vào thư mục đã chọn trong Media Library.</small>
       <button type="button" id="btnPickMedia" class="ghost-btn">Chọn từ Media Library</button>
       <div id="pickedMediaWrap" class="picked-media"></div>
-
-      <label>Thumbnail</label>
-      <input id="thumbnailInput" type="file" accept="image/*" />
       <div id="previewWrap" class="preview-wrap"></div>
 
       <div class="modal-actions">
