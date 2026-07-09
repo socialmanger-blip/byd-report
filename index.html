@@ -129,19 +129,47 @@
 
             <section class="report-grid">
               <div class="report-panel panel-wide" data-bi-panel="overview monthly">
-                <h4>Total Posts by Week</h4>
+                <div class="panel-head">
+                  <h4>Total Posts by Week</h4>
+                  <select class="chart-type-select" data-chart-target="weekStats">
+                    <option value="bar">Thanh ngang</option>
+                    <option value="tile">Thẻ số</option>
+                    <option value="donut">Vòng tròn</option>
+                  </select>
+                </div>
                 <div id="weekStats" class="week-stats"></div>
               </div>
               <div class="report-panel" data-bi-panel="overview platform">
-                <h4># of Post by Platform</h4>
+                <div class="panel-head">
+                  <h4># of Post by Platform</h4>
+                  <select class="chart-type-select" data-chart-target="platformStats">
+                    <option value="bar">Thanh ngang</option>
+                    <option value="tile">Thẻ số</option>
+                    <option value="donut">Vòng tròn</option>
+                  </select>
+                </div>
                 <div id="platformStats" class="mini-stats"></div>
               </div>
               <div class="report-panel" data-bi-panel="overview showroom">
-                <h4># of Post by Showroom</h4>
+                <div class="panel-head">
+                  <h4># of Post by Showroom</h4>
+                  <select class="chart-type-select" data-chart-target="showroomStats">
+                    <option value="bar">Thanh ngang</option>
+                    <option value="tile">Thẻ số</option>
+                    <option value="donut">Vòng tròn</option>
+                  </select>
+                </div>
                 <div id="showroomStats" class="mini-stats"></div>
               </div>
               <div class="report-panel panel-trend" data-bi-panel="overview monthly">
-                <h4># of Post by Day</h4>
+                <div class="panel-head">
+                  <h4># of Post by Day</h4>
+                  <select class="chart-type-select" data-chart-target="dailyTrend">
+                    <option value="column">Cột</option>
+                    <option value="line">Đường</option>
+                    <option value="tile">Thẻ ngày</option>
+                  </select>
+                </div>
                 <div id="dailyTrend" class="daily-trend"></div>
               </div>
             </section>

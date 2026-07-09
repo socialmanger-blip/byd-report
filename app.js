@@ -196,6 +196,9 @@ function bindEvents(){
   $('btnCloseMoveMedia').addEventListener('click', closeMoveMediaModal);
   $('btnCancelMoveMedia').addEventListener('click', closeMoveMediaModal);
   $('btnConfirmMoveMedia').addEventListener('click', confirmMoveMediaFile);
+  document.querySelectorAll('.chart-type-select').forEach(select => {
+    select.addEventListener('change', updateStats);
+  });
   $('searchInput').addEventListener('input', renderPosts);
   $('statusFilter').addEventListener('change', renderPosts);
   $('yearFilter').addEventListener('change', renderPosts);
@@ -383,7 +386,10 @@ function renderPosts(){
   updateReportPanels();
   updateStats();
   if(result.length === 0){
-    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Chưa có bài đăng nào</td></tr>`;
+    const message = posts.length
+      ? 'Không có bài phù hợp với bộ lọc hiện tại'
+      : 'Supabase đang trả về 0 bài. Nếu trước đó có bài, hãy kiểm tra đã đăng nhập đúng tài khoản và đã chạy file supabase_rls_fix.sql chưa.';
+    $('postTable').innerHTML = `<tr><td colspan="8" class="empty">${escapeHtml(message)}</td></tr>`;
     return;
   }
   $('postTable').innerHTML = result.map(p => `
@@ -1393,6 +1399,7 @@ function renderMediaFolders(){
     <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''}">
       <button onclick="selectMediaFolder('${escapeJs(folder)}')">${renderFolderLabel(folder)}</button>
       ${folder === 'all' ? '' : `
+        <button class="folder-add" title="Tạo thư mục con" onclick="createMediaFolder('${escapeJs(folder)}')">+</button>
         <button class="folder-edit" title="Đổi tên thư mục" onclick="renameMediaFolder('${escapeJs(folder)}')">✎</button>
         <button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>
       `}
@@ -1556,10 +1563,14 @@ async function uploadFileToMediaLibrary(file, folder){
   return item;
 }
 
-function createMediaFolder(){
-  const name = prompt('Nhập tên thư mục hoặc đường dẫn thư mục con');
+function createMediaFolder(parentFolder = ''){
+  const baseFolder = parentFolder || (currentMediaFolder !== 'all' ? currentMediaFolder : '');
+  const label = baseFolder ? `Tạo thư mục con trong "${baseFolder}"` : 'Nhập tên thư mục';
+  const name = prompt(label);
   if(!name) return;
-  const folder = name.trim();
+  const cleanName = name.trim().replace(/^\/+|\/+$/g, '');
+  if(!cleanName) return;
+  const folder = baseFolder && !cleanName.includes('/') ? `${baseFolder}/${cleanName}` : cleanName;
   if(!folder) return;
   if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
   currentMediaFolder = folder;
@@ -1830,6 +1841,33 @@ function renderKeyValueStats(targetId, data){
     $(targetId).innerHTML = '<div class="empty-mini">Chưa có dữ liệu</div>';
     return;
   }
+  const chartType = getChartType(targetId, 'bar');
+  if(chartType === 'tile'){
+    $(targetId).innerHTML = `<div class="chart-tiles">${entries.map(([name, count]) => `
+      <div class="chart-tile"><b>${count}</b><span>${escapeHtml(name)}</span></div>
+    `).join('')}</div>`;
+    return;
+  }
+  if(chartType === 'donut'){
+    const total = entries.reduce((sum, item) => sum + item[1], 0) || 1;
+    let offset = 0;
+    const colors = ['#22d3ee', '#3b82f6', '#8b5cf6', '#34d399', '#fbbf24', '#f87171'];
+    const gradient = entries.map(([name, count], index) => {
+      const start = offset;
+      const end = offset + (count / total * 100);
+      offset = end;
+      return `${colors[index % colors.length]} ${start}% ${end}%`;
+    }).join(', ');
+    $(targetId).innerHTML = `
+      <div class="donut-chart-wrap">
+        <div class="donut-chart" style="background: conic-gradient(${gradient})"><b>${total}</b><span>Tổng</span></div>
+        <div class="donut-legend">${entries.map(([name, count], index) => `
+          <div><i style="background:${colors[index % colors.length]}"></i><span>${escapeHtml(name)}</span><b>${count}</b></div>
+        `).join('')}</div>
+      </div>
+    `;
+    return;
+  }
   const max = Math.max(...entries.map(x=>x[1]), 1);
   $(targetId).innerHTML = entries.map(([name, count], index) => `
     <div class="stat-row" style="--bar-index:${index}">
@@ -1837,6 +1875,11 @@ function renderKeyValueStats(targetId, data){
       <div class="bar"><i style="width:${Math.max(8, Math.round(count/max*100))}%"></i></div>
     </div>
   `).join('');
+}
+
+function getChartType(targetId, fallback){
+  const select = document.querySelector(`[data-chart-target="${targetId}"]`);
+  return select ? select.value : fallback;
 }
 
 function updateStats(){
@@ -1865,6 +1908,7 @@ function updateStats(){
 function renderDailyTrend(monthPosts){
   const target = $('dailyTrend');
   if(!target) return;
+  const chartType = getChartType('dailyTrend', 'column');
   const selectedMonth = $('monthFilter').value;
   const daysInMonth = selectedMonth
     ? new Date(Number(selectedMonth.slice(0,4)), Number(selectedMonth.slice(5,7)), 0).getDate()
@@ -1880,6 +1924,14 @@ function renderDailyTrend(monthPosts){
   const visible = dayCounts.filter(item => item.count > 0);
   const series = visible.length ? visible : dayCounts.slice(0, Math.min(daysInMonth, 12));
   const max = Math.max(...series.map(item => item.count), 1);
+  if(chartType === 'tile'){
+    target.className = 'daily-trend is-tiles';
+    target.innerHTML = series.map(item => `
+      <div class="chart-tile"><b>${item.count}</b><span>Ngày ${item.day}</span></div>
+    `).join('');
+    return;
+  }
+  target.className = chartType === 'line' ? 'daily-trend is-line' : 'daily-trend';
   target.innerHTML = series.map(item => `
     <div class="trend-column">
       <span class="trend-value">${item.count}</span>
