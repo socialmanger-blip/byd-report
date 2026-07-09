@@ -10,7 +10,24 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
+  <section class="auth-screen" id="authScreen">
+    <form class="auth-card" id="loginForm">
+      <div class="auth-brand">
+        <span>SocialHub</span>
+        <b>BYD NEG</b>
+      </div>
+      <h1>Đăng nhập hệ thống</h1>
+      <p>Chỉ tài khoản được cấp trong Supabase Auth mới truy cập được dashboard.</p>
+      <label>Email</label>
+      <input id="loginEmail" type="email" autocomplete="email" placeholder="name@bydneg.vn" required />
+      <label>Mật khẩu</label>
+      <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
+      <button class="primary" id="btnLogin" type="submit">Đăng nhập</button>
+      <div class="auth-message" id="loginMessage"></div>
+    </form>
+  </section>
+
+  <div class="app app-shell" id="appShell">
     <aside class="sidebar">
       <h1>SocialHub</h1>
       <p>BYD NEG Content Manager</p>
@@ -42,6 +59,10 @@
         <div class="top-actions post-content">
           <button id="btnOpenExportTop">Xuất Excel</button>
           <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
+        </div>
+        <div class="user-box">
+          <span id="currentUserEmail">-</span>
+          <button id="btnLogout" type="button">Đăng xuất</button>
         </div>
       </header>
 

@@ -4,6 +4,8 @@ let currentShowroom = 'all';
 let editingId = null;
 let editingImageUrls = [];
 let editingMediaUrls = [];
+let appReady = false;
+let currentUser = null;
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -102,13 +104,68 @@ let exportFields = JSON.parse(JSON.stringify(defaultExportFields));
 const $ = (id) => document.getElementById(id);
 
 window.addEventListener('DOMContentLoaded', async () => {
+  bindAuthEvents();
+  const { data } = await supabaseClient.auth.getSession();
+  if(data && data.session){
+    await startApp(data.session);
+  }else{
+    showLogin();
+  }
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    if(session) startApp(session);
+    else showLogin();
+  });
+});
+
+function bindAuthEvents(){
+  $('loginForm').addEventListener('submit', loginUser);
+  $('btnLogout').addEventListener('click', logoutUser);
+}
+
+async function loginUser(event){
+  event.preventDefault();
+  $('btnLogin').disabled = true;
+  $('btnLogin').innerText = 'Đang đăng nhập...';
+  $('loginMessage').innerText = '';
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error){
+    $('loginMessage').innerText = 'Sai email/mật khẩu hoặc tài khoản chưa được cấp.';
+    $('btnLogin').disabled = false;
+    $('btnLogin').innerText = 'Đăng nhập';
+    return;
+  }
+  $('btnLogin').innerText = 'Đăng nhập';
+}
+
+async function logoutUser(){
+  await supabaseClient.auth.signOut();
+}
+
+function showLogin(){
+  currentUser = null;
+  $('authScreen').classList.remove('is-hidden');
+  $('appShell').classList.remove('is-visible');
+  $('loginPassword').value = '';
+  $('btnLogin').disabled = false;
+  $('btnLogin').innerText = 'Đăng nhập';
+}
+
+async function startApp(session){
+  currentUser = session.user;
+  $('authScreen').classList.add('is-hidden');
+  $('appShell').classList.add('is-visible');
+  $('currentUserEmail').innerText = currentUser.email || '-';
+  if(appReady) return;
+  appReady = true;
   bindEvents();
   setDefaultMonth();
   await loadCloudData();
   renderGoogleMapShowrooms();
   renderChannelAccounts();
-  loadPosts();
-});
+  await loadPosts();
+}
 
 function bindEvents(){
   $('btnOpenModal').addEventListener('click', () => openModal());

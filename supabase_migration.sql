@@ -92,3 +92,99 @@ begin
     create policy google_business_public_all on public.google_business for all using (true) with check (true);
   end if;
 end $$;
+
+-- Bảo mật đăng nhập: chỉ user đã đăng nhập Supabase Auth mới được đọc/ghi dữ liệu.
+-- Chạy block này sau khi bạn đã tạo tài khoản trong Supabase > Authentication > Users.
+alter table public.posts enable row level security;
+alter table public.media_library enable row level security;
+alter table public.channel_accounts enable row level security;
+alter table public.monthly_kpis enable row level security;
+alter table public.google_business enable row level security;
+
+do $$
+declare
+  policy_record record;
+begin
+  for policy_record in
+    select schemaname, tablename, policyname
+    from pg_policies
+    where schemaname = 'public'
+      and tablename in ('posts', 'media_library', 'channel_accounts', 'monthly_kpis', 'google_business')
+  loop
+    execute format(
+      'drop policy if exists %I on %I.%I',
+      policy_record.policyname,
+      policy_record.schemaname,
+      policy_record.tablename
+    );
+  end loop;
+end $$;
+
+create policy posts_authenticated_all
+on public.posts
+for all
+to authenticated
+using (true)
+with check (true);
+
+create policy media_library_authenticated_all
+on public.media_library
+for all
+to authenticated
+using (true)
+with check (true);
+
+create policy channel_accounts_authenticated_all
+on public.channel_accounts
+for all
+to authenticated
+using (true)
+with check (true);
+
+create policy monthly_kpis_authenticated_all
+on public.monthly_kpis
+for all
+to authenticated
+using (true)
+with check (true);
+
+create policy google_business_authenticated_all
+on public.google_business
+for all
+to authenticated
+using (true)
+with check (true);
+
+-- Storage: cho user đã đăng nhập thao tác với bucket post-images.
+-- Nếu bucket đang public, người có link ảnh vẫn có thể xem ảnh trực tiếp; còn website và dữ liệu đã bị khóa bằng Auth/RLS.
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'post_images_authenticated_select') then
+    create policy post_images_authenticated_select
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'post-images');
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'post_images_authenticated_insert') then
+    create policy post_images_authenticated_insert
+    on storage.objects for insert
+    to authenticated
+    with check (bucket_id = 'post-images');
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'post_images_authenticated_update') then
+    create policy post_images_authenticated_update
+    on storage.objects for update
+    to authenticated
+    using (bucket_id = 'post-images')
+    with check (bucket_id = 'post-images');
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'post_images_authenticated_delete') then
+    create policy post_images_authenticated_delete
+    on storage.objects for delete
+    to authenticated
+    using (bucket_id = 'post-images');
+  end if;
+end $$;
