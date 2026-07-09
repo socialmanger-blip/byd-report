@@ -2503,3 +2503,295 @@ tbody tr:hover {
 .modal-box .sub-label {
   color: #315a62;
 }
+
+/* Mobile friendly shell */
+@media (max-width: 760px) {
+  body {
+    background: #f4f8f9;
+  }
+
+  .auth-screen {
+    min-height: 100svh;
+    padding: 16px;
+    align-items: start;
+    padding-top: 42px;
+  }
+
+  .auth-card {
+    padding: 22px;
+    border-radius: 16px;
+  }
+
+  .auth-brand span {
+    font-size: 24px;
+  }
+
+  .auth-card h1 {
+    font-size: 22px;
+  }
+
+  .auth-card input,
+  .auth-card button {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .app.app-shell.is-visible {
+    display: block;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    width: 100%;
+    height: auto;
+    max-height: 46vh;
+    padding: 14px;
+    border-radius: 0 0 18px 18px;
+    overflow: auto;
+  }
+
+  .sidebar h1 {
+    font-size: 24px;
+  }
+
+  .sidebar p {
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+
+  .nav-title {
+    margin: 14px 0 8px;
+  }
+
+  .nav,
+  .showroom-nav,
+  .library-nav {
+    min-height: 44px;
+    margin: 6px 0;
+    border-radius: 9px;
+    font-size: 15px;
+  }
+
+  .cloud-box {
+    display: none;
+  }
+
+  .main {
+    padding: 14px;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .topbar h2 {
+    font-size: 24px;
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .top-actions button,
+  .user-box button {
+    min-height: 42px;
+  }
+
+  .user-box {
+    justify-content: space-between;
+    border-radius: 12px;
+  }
+
+  .user-box span {
+    max-width: 62vw;
+  }
+
+  .bi-dashboard {
+    border-radius: 14px;
+  }
+
+  .bi-titlebar {
+    min-height: auto;
+    padding: 14px 12px;
+  }
+
+  .bi-titlebar h3 {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .bi-titlebar span {
+    font-size: 10px;
+  }
+
+  .bi-tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bi-tabs button {
+    min-height: 40px;
+    font-size: 12px;
+  }
+
+  .bi-layout {
+    grid-template-columns: 1fr;
+    padding: 8px;
+  }
+
+  .bi-filter-pane {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .filter-card {
+    padding: 9px;
+  }
+
+  .filter-card input,
+  .filter-card select {
+    min-height: 42px;
+    font-size: 15px;
+  }
+
+  .bi-filter-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bi-dashboard .cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .bi-dashboard .card {
+    min-height: 78px;
+    padding: 12px 10px;
+  }
+
+  .bi-dashboard .card b {
+    font-size: 26px;
+  }
+
+  .bi-dashboard .card span {
+    font-size: 11px;
+  }
+
+  .bi-dashboard .report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bi-dashboard .report-panel,
+  .bi-dashboard .panel-wide,
+  .bi-dashboard .panel-trend {
+    min-height: auto;
+  }
+
+  .daily-trend {
+    grid-template-columns: repeat(8, minmax(28px, 1fr));
+    overflow-x: auto;
+  }
+
+  .showroom-dashboard,
+  .google-showrooms,
+  .channel-accounts,
+  .media-library {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .workspace-layout,
+  .media-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-kpi,
+  .google-summary,
+  .google-grid,
+  .account-grid,
+  .showroom-module-grid,
+  .media-grid,
+  .media-picker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .media-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .media-toolbar > * {
+    width: 100%;
+  }
+
+  .table-wrap {
+    border-radius: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 900px;
+  }
+
+  th,
+  td {
+    padding: 11px;
+  }
+
+  .modal {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .modal-box {
+    width: 100%;
+    max-height: calc(100svh - 20px);
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .modal-head h3 {
+    font-size: 21px;
+  }
+
+  .modal-box input,
+  .modal-box select,
+  .modal-box textarea,
+  .modal-actions button,
+  .ghost-btn {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding-top: 10px;
+    background: #fff;
+  }
+
+  .showroom-checks,
+  .platform-checks {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .bi-dashboard .cards,
+  .top-actions,
+  .bi-filter-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    max-height: 54vh;
+  }
+}
