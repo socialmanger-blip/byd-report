@@ -75,10 +75,10 @@ const defaultGoogleMapShowrooms = [
     mapLink: ''
   }
 ];
-let googleMapShowrooms = loadGoogleMapShowrooms();
-let channelAccounts = loadChannelAccounts();
-let monthlyKpis = loadMonthlyKpis();
-let mediaLibrary = loadMediaLibrary();
+let googleMapShowrooms = JSON.parse(JSON.stringify(defaultGoogleMapShowrooms));
+let channelAccounts = createDefaultChannelAccounts();
+let monthlyKpis = {};
+let mediaLibrary = { folders: defaultMediaFolders(), files: [] };
 let currentMediaFolder = 'all';
 let selectedLibraryMediaUrls = [];
 let pendingPickedMedia = new Set();
@@ -101,9 +101,10 @@ let exportFields = JSON.parse(JSON.stringify(defaultExportFields));
 
 const $ = (id) => document.getElementById(id);
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
   setDefaultMonth();
+  await loadCloudData();
   renderGoogleMapShowrooms();
   renderChannelAccounts();
   loadPosts();
@@ -485,6 +486,7 @@ function handleMonthlyKpiInput(event){
   monthlyKpis[key] = monthlyKpis[key] || { reach:0, engagement:0, follow:0, like:0 };
   monthlyKpis[key][field] = Math.max(0, Number(event.target.value || 0));
   saveMonthlyKpis();
+  saveMonthlyKpiToSupabase(month, showroom, platform).catch(err => console.warn('Không lưu được KPI lên Supabase:', err));
   renderShowroomDashboard();
 }
 
@@ -541,19 +543,20 @@ function getShowroomChannelAccount(platform, showroom){
 }
 
 function setShowroomChannelLink(platform, showroom, link){
-  if(!channelAccounts[platform]){
-    channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'', avatar:'' }));
-  }
-  let found = channelAccounts[platform].find(account => account.showroom === showroom);
-  if(!found){
-    found = { showroom, link:'', avatar:'' };
-    channelAccounts[platform].push(found);
-  }
+  const found = setChannelAccountLocal(platform, showroom);
   found.link = link;
   saveChannelAccounts();
+  saveChannelAccountToSupabase(platform, showroom).catch(err => console.warn('Không lưu được link account lên Supabase:', err));
 }
 
 function setShowroomChannelAvatar(platform, showroom, avatar){
+  const found = setChannelAccountLocal(platform, showroom);
+  found.avatar = avatar;
+  saveChannelAccounts();
+  saveChannelAccountToSupabase(platform, showroom).catch(err => console.warn('Không lưu được avatar account lên Supabase:', err));
+}
+
+function setChannelAccountLocal(platform, showroom, link, avatar){
   if(!channelAccounts[platform]){
     channelAccounts[platform] = showroomNames.map(name => ({ showroom:name, link:'', avatar:'' }));
   }
@@ -562,8 +565,9 @@ function setShowroomChannelAvatar(platform, showroom, avatar){
     found = { showroom, link:'', avatar:'' };
     channelAccounts[platform].push(found);
   }
-  found.avatar = avatar;
-  saveChannelAccounts();
+  if(link !== undefined) found.link = link;
+  if(avatar !== undefined) found.avatar = avatar;
+  return found;
 }
 
 function getGoogleMapInfoForShowroom(showroom){
@@ -846,6 +850,7 @@ function normalizeText(text){
 
 function saveGoogleMapShowrooms(){
   localStorage.setItem(googleMapStorageKey, JSON.stringify(googleMapShowrooms));
+  saveGoogleBusinessToSupabase().catch(err => console.warn('Không lưu được Google Maps lên Supabase:', err));
 }
 
 function loadChannelAccounts(){
@@ -895,6 +900,151 @@ function loadMonthlyKpis(){
 
 function saveMonthlyKpis(){
   localStorage.setItem(monthlyKpiStorageKey, JSON.stringify(monthlyKpis));
+}
+
+async function loadCloudData(){
+  const results = await Promise.allSettled([
+    loadGoogleBusinessFromSupabase(),
+    loadChannelAccountsFromSupabase(),
+    loadMonthlyKpisFromSupabase(),
+    loadMediaLibraryFromSupabase()
+  ]);
+  results.forEach(result => {
+    if(result.status === 'rejected') console.warn('Có dữ liệu chưa đồng bộ được từ Supabase:', result.reason);
+  });
+}
+
+async function loadGoogleBusinessFromSupabase(){
+  const { data, error } = await supabaseClient.from('google_business').select('*');
+  if(error){
+    console.warn('Không đọc được Google Maps từ Supabase:', error);
+    googleMapShowrooms = loadGoogleMapShowrooms();
+    return;
+  }
+  if(!data || !data.length){
+    googleMapShowrooms = loadGoogleMapShowrooms();
+    await saveGoogleBusinessToSupabase();
+    return;
+  }
+  googleMapShowrooms = mergeGoogleMapDefaults(data.map(row => ({
+    type: row.type || '',
+    name: row.name || '',
+    address: row.address || '',
+    image: row.image || '',
+    mapLink: row.map_link || '',
+    reviews: toNumber(row.reviews),
+    target: toNumber(row.target) || 100
+  })));
+  saveGoogleMapShowroomsLocal();
+}
+
+function saveGoogleMapShowroomsLocal(){
+  localStorage.setItem(googleMapStorageKey, JSON.stringify(googleMapShowrooms));
+}
+
+async function saveGoogleBusinessToSupabase(){
+  const { error: deleteError } = await supabaseClient.from('google_business').delete().neq('name', '__never__');
+  if(deleteError) throw deleteError;
+  const rows = googleMapShowrooms.map(item => ({
+    name: item.name || '',
+    type: item.type || '',
+    address: item.address || '',
+    image: item.image || '',
+    map_link: item.mapLink || '',
+    reviews: toNumber(item.reviews),
+    target: toNumber(item.target) || 100,
+    updated_at: new Date().toISOString()
+  }));
+  const { error } = await supabaseClient.from('google_business').insert(rows);
+  if(error) throw error;
+}
+
+async function loadChannelAccountsFromSupabase(){
+  const { data, error } = await supabaseClient.from('channel_accounts').select('*');
+  if(error){
+    console.warn('Không đọc được account từ Supabase:', error);
+    channelAccounts = loadChannelAccounts();
+    return;
+  }
+  if(!data || !data.length){
+    channelAccounts = loadChannelAccounts();
+    await saveAllChannelAccountsToSupabase();
+    return;
+  }
+  channelAccounts = createDefaultChannelAccounts();
+  data.forEach(row => {
+    setChannelAccountLocal(row.platform, row.showroom, row.link || '', row.avatar || '');
+  });
+  saveChannelAccounts();
+}
+
+async function saveAllChannelAccountsToSupabase(){
+  const tasks = [];
+  Object.keys(channelAccounts).forEach(platform => {
+    (channelAccounts[platform] || []).forEach(account => {
+      tasks.push(saveChannelAccountToSupabase(platform, account.showroom));
+    });
+  });
+  await Promise.all(tasks);
+}
+
+async function saveChannelAccountToSupabase(platform, showroom){
+  const account = getShowroomChannelAccount(platform, showroom);
+  const { error } = await supabaseClient.from('channel_accounts').upsert({
+    platform,
+    showroom,
+    link: account.link || '',
+    avatar: account.avatar || '',
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'platform,showroom' });
+  if(error) throw error;
+}
+
+async function loadMonthlyKpisFromSupabase(){
+  const { data, error } = await supabaseClient.from('monthly_kpis').select('*');
+  if(error){
+    console.warn('Không đọc được KPI từ Supabase:', error);
+    monthlyKpis = loadMonthlyKpis();
+    return;
+  }
+  if(!data || !data.length){
+    monthlyKpis = loadMonthlyKpis();
+    await saveAllMonthlyKpisToSupabase();
+    return;
+  }
+  monthlyKpis = {};
+  data.forEach(row => {
+    const key = `${row.month || 'all'}|${row.showroom}|${row.platform}`;
+    monthlyKpis[key] = {
+      reach: toNumber(row.reach),
+      engagement: toNumber(row.engagement),
+      follow: toNumber(row.follow),
+      like: toNumber(row.like_count)
+    };
+  });
+  saveMonthlyKpis();
+}
+
+async function saveAllMonthlyKpisToSupabase(){
+  await Promise.all(Object.keys(monthlyKpis).map(key => {
+    const [month, showroom, platform] = key.split('|');
+    return saveMonthlyKpiToSupabase(month, showroom, platform);
+  }));
+}
+
+async function saveMonthlyKpiToSupabase(month, showroom, platform){
+  const kpi = getMonthlyKpi(showroom, platform, month);
+  const { error } = await supabaseClient.from('monthly_kpis').upsert({
+    month: month || 'all',
+    showroom,
+    platform,
+    reach: toNumber(kpi.reach),
+    engagement: toNumber(kpi.engagement),
+    follow: toNumber(kpi.follow),
+    like_count: toNumber(kpi.like),
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'month,showroom,platform' });
+  if(error) throw error;
 }
 
 function defaultMediaFolders(){
@@ -957,6 +1107,129 @@ function loadMediaLibrary(){
 
 function saveMediaLibrary(){
   localStorage.setItem(mediaLibraryStorageKey, JSON.stringify(mediaLibrary));
+}
+
+async function loadMediaLibraryFromSupabase(){
+  const { data, error } = await supabaseClient
+    .from('media_library')
+    .select('*')
+    .order('uploaded_at', { ascending:false });
+  if(error){
+    console.warn('Không đọc được Media Library từ Supabase:', error);
+    mediaLibrary = loadMediaLibrary();
+    return;
+  }
+  if(!data || !data.length){
+    mediaLibrary = loadMediaLibrary();
+    await migrateLocalMediaLibraryToSupabase();
+    return;
+  }
+  const folders = data
+    .filter(row => row.type === 'folder')
+    .map(row => row.folder)
+    .filter(Boolean);
+  const files = data
+    .filter(row => row.type !== 'folder')
+    .map(row => ({
+      id: row.id,
+      name: row.name || 'Tệp chưa đặt tên',
+      folder: row.folder || 'Tài liệu khác',
+      url: row.url || '',
+      type: row.type || 'application/octet-stream',
+      size: toNumber(row.size),
+      uploadedAt: row.uploaded_at || new Date().toISOString()
+    }));
+  mediaLibrary = {
+    folders: [...new Set([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)])],
+    files
+  };
+  saveMediaLibrary();
+}
+
+async function migrateLocalMediaLibraryToSupabase(){
+  const folders = [...new Set(mediaLibrary.folders || [])];
+  await Promise.all(folders.map(folder => saveMediaFolderToSupabase(folder)));
+  const rows = (mediaLibrary.files || []).map(file => ({
+    name: file.name || 'Tệp chưa đặt tên',
+    folder: file.folder || 'Tài liệu khác',
+    url: file.url || '',
+    type: file.type || 'application/octet-stream',
+    size: toNumber(file.size),
+    uploaded_at: file.uploadedAt || new Date().toISOString()
+  })).filter(row => row.url);
+  if(rows.length){
+    const { data, error } = await supabaseClient.from('media_library').insert(rows).select('*');
+    if(error) throw error;
+    mediaLibrary.files = (data || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      folder: row.folder,
+      url: row.url,
+      type: row.type || 'application/octet-stream',
+      size: toNumber(row.size),
+      uploadedAt: row.uploaded_at
+    }));
+  }
+  saveMediaLibrary();
+}
+
+async function saveMediaFolderToSupabase(folder){
+  if(!folder) return;
+  const { data } = await supabaseClient
+    .from('media_library')
+    .select('id')
+    .eq('folder', folder)
+    .eq('type', 'folder')
+    .limit(1);
+  if(data && data.length) return;
+  const { error } = await supabaseClient.from('media_library').insert({
+    name: '.folder',
+    folder,
+    url: '#folder',
+    type: 'folder',
+    size: 0
+  });
+  if(error) throw error;
+}
+
+function updateMediaFolderInSupabase(folder, nextFolder){
+  supabaseClient
+    .from('media_library')
+    .update({ folder: nextFolder })
+    .eq('folder', folder)
+    .then(({ error }) => {
+      if(error) console.warn('Không đổi tên thư mục trên Supabase:', error);
+    });
+}
+
+function deleteMediaFolderFromSupabase(folder){
+  supabaseClient
+    .from('media_library')
+    .delete()
+    .eq('folder', folder)
+    .then(({ error }) => {
+      if(error) console.warn('Không xóa được thư mục trên Supabase:', error);
+    });
+}
+
+function updateMediaFileInSupabase(id, fields){
+  supabaseClient
+    .from('media_library')
+    .update(fields)
+    .eq('id', id)
+    .then(({ error }) => {
+      if(error) console.warn('Không cập nhật được Media Library trên Supabase:', error);
+    });
+}
+
+function deleteMediaFileFromSupabase(id){
+  supabaseClient
+    .from('media_library')
+    .delete()
+    .eq('id', id)
+    .then(({ error }) => {
+      if(error) console.warn('Không xóa được file Media Library trên Supabase:', error);
+    });
 }
 
 function renderMediaLibrary(){
@@ -1054,14 +1327,24 @@ async function uploadMediaLibraryFiles(files){
     $('mediaDropZone').innerText = `Đang upload ${files.length} tệp...`;
     for(const file of files){
       const url = await uploadFile(file, 'media-library');
-      mediaLibrary.files.unshift({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      const row = {
         name: file.name,
         folder,
         url,
         type: file.type || 'application/octet-stream',
         size: file.size,
-        uploadedAt: new Date().toISOString()
+        uploaded_at: new Date().toISOString()
+      };
+      const { data, error } = await supabaseClient.from('media_library').insert(row).select('*').single();
+      if(error) throw error;
+      mediaLibrary.files.unshift({
+        id: data.id,
+        name: data.name,
+        folder: data.folder,
+        url: data.url,
+        type: data.type || 'application/octet-stream',
+        size: toNumber(data.size),
+        uploadedAt: data.uploaded_at
       });
     }
     saveMediaLibrary();
@@ -1083,6 +1366,7 @@ function createMediaFolder(){
   if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
   currentMediaFolder = folder;
   saveMediaLibrary();
+  saveMediaFolderToSupabase(folder).catch(err => console.warn('Không lưu được thư mục lên Supabase:', err));
   renderMediaLibrary();
 }
 
@@ -1101,6 +1385,7 @@ function renameMediaFolder(folder){
   });
   if(currentMediaFolder === folder) currentMediaFolder = nextFolder;
   saveMediaLibrary();
+  updateMediaFolderInSupabase(folder, nextFolder);
   renderMediaLibrary();
 }
 
@@ -1114,6 +1399,7 @@ function deleteMediaFolder(folder){
   mediaLibrary.files = mediaLibrary.files.filter(file => file.folder !== folder);
   if(currentMediaFolder === folder) currentMediaFolder = 'all';
   saveMediaLibrary();
+  deleteMediaFolderFromSupabase(folder);
   renderMediaLibrary();
 }
 
@@ -1124,6 +1410,7 @@ function renameMediaFile(id){
   if(!name) return;
   file.name = name.trim();
   saveMediaLibrary();
+  updateMediaFileInSupabase(id, { name: file.name });
   renderMediaLibrary();
 }
 
@@ -1133,8 +1420,12 @@ function moveMediaFile(id){
   const folder = prompt('Di chuyển tới thư mục', file.folder);
   if(!folder) return;
   file.folder = folder.trim();
-  if(!mediaLibrary.folders.includes(file.folder)) mediaLibrary.folders.push(file.folder);
+  if(!mediaLibrary.folders.includes(file.folder)){
+    mediaLibrary.folders.push(file.folder);
+    saveMediaFolderToSupabase(file.folder).catch(err => console.warn('Không lưu được thư mục lên Supabase:', err));
+  }
   saveMediaLibrary();
+  updateMediaFileInSupabase(id, { folder: file.folder });
   renderMediaLibrary();
 }
 
@@ -1142,6 +1433,7 @@ function deleteMediaFile(id){
   if(!confirm('Xóa tài nguyên khỏi Media Library?')) return;
   mediaLibrary.files = mediaLibrary.files.filter(file => file.id !== id);
   saveMediaLibrary();
+  deleteMediaFileFromSupabase(id);
   renderMediaLibrary();
 }
 
