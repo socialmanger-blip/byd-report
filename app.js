@@ -83,6 +83,7 @@ let channelAccounts = createDefaultChannelAccounts();
 let monthlyKpis = {};
 let mediaLibrary = { folders: defaultMediaFolders(), files: [] };
 let currentMediaFolder = 'all';
+let movingMediaFileId = null;
 let selectedLibraryMediaUrls = [];
 let pendingPickedMedia = new Set();
 
@@ -192,6 +193,9 @@ function bindEvents(){
   $('btnCancelMediaPicker').addEventListener('click', closeMediaPicker);
   $('btnUsePickedMedia').addEventListener('click', usePickedMedia);
   $('mediaPickerSearch').addEventListener('input', renderMediaPicker);
+  $('btnCloseMoveMedia').addEventListener('click', closeMoveMediaModal);
+  $('btnCancelMoveMedia').addEventListener('click', closeMoveMediaModal);
+  $('btnConfirmMoveMedia').addEventListener('click', confirmMoveMediaFile);
   $('searchInput').addEventListener('input', renderPosts);
   $('statusFilter').addEventListener('change', renderPosts);
   $('yearFilter').addEventListener('change', renderPosts);
@@ -202,6 +206,7 @@ function bindEvents(){
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
+  $('moveMediaModal').addEventListener('click', (e)=>{ if(e.target.id==='moveMediaModal') closeMoveMediaModal(); });
   $('imageInput').addEventListener('change', previewImages);
   document.querySelectorAll('[data-bi-view]').forEach(button => {
     button.addEventListener('click', () => setBiView(button.dataset.biView));
@@ -1123,6 +1128,20 @@ async function saveMonthlyKpiToSupabase(month, showroom, platform){
 
 function defaultMediaFolders(){
   return [
+    'Sản phẩm',
+    'Showroom',
+    'Chiến dịch',
+    'Banner & Template',
+    'Logo & Brand',
+    'Brochure',
+    'Đào tạo',
+    'SOP',
+    'Tài liệu'
+  ];
+}
+
+function legacyDefaultMediaFolders(){
+  return [
     'Hình ảnh sản phẩm/Sealion 6',
     'Hình ảnh sản phẩm/Seal 5',
     'Hình ảnh sản phẩm/M6',
@@ -1145,7 +1164,6 @@ function defaultMediaFolders(){
     'Hình ảnh Showroom/Kiên Giang',
     'Hình ảnh Showroom/An Giang',
     'Hình ảnh Showroom/Tiền Giang',
-    'Banner & Template',
     'Chiến dịch Marketing/Khai trương',
     'Chiến dịch Marketing/Roadshow',
     'Chiến dịch Marketing/Caravan',
@@ -1163,14 +1181,22 @@ function defaultMediaFolders(){
   ];
 }
 
+function normalizeMediaFolders(folders, files = []){
+  const legacy = new Set(legacyDefaultMediaFolders());
+  const foldersWithFiles = new Set((files || []).map(file => file.folder).filter(Boolean));
+  return [...new Set([...(folders || []), ...foldersWithFiles])]
+    .filter(folder => folder && (!legacy.has(folder) || foldersWithFiles.has(folder)));
+}
+
 function loadMediaLibrary(){
   try{
     const saved = localStorage.getItem(mediaLibraryStorageKey);
     if(saved){
       const parsed = JSON.parse(saved);
+      const files = parsed.files || [];
       return {
-        folders: [...new Set([...defaultMediaFolders(), ...(parsed.folders || [])])],
-        files: parsed.files || []
+        folders: normalizeMediaFolders([...defaultMediaFolders(), ...(parsed.folders || [])], files),
+        files
       };
     }
   }catch(err){
@@ -1214,7 +1240,7 @@ async function loadMediaLibraryFromSupabase(){
       uploadedAt: row.uploaded_at || new Date().toISOString()
     }));
   mediaLibrary = {
-    folders: [...new Set([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)])],
+    folders: normalizeMediaFolders([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)], files),
     files
   };
   saveMediaLibrary();
@@ -1286,24 +1312,70 @@ function deleteMediaFolderFromSupabase(folder){
     });
 }
 
-function updateMediaFileInSupabase(id, fields){
-  supabaseClient
-    .from('media_library')
-    .update(fields)
-    .eq('id', id)
-    .then(({ error }) => {
-      if(error) console.warn('Không cập nhật được Media Library trên Supabase:', error);
-    });
+function isUuid(value){
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
-function deleteMediaFileFromSupabase(id){
-  supabaseClient
+async function updateMediaFileInSupabase(id, fields){
+  const file = mediaLibrary.files.find(item => item.id === id);
+  if(!file) return;
+  const payload = {
+    name: file.name || 'Tệp chưa đặt tên',
+    folder: file.folder || 'Tài liệu',
+    url: file.url || '',
+    type: file.type || guessMediaType(file.name),
+    size: toNumber(file.size),
+    uploaded_at: file.uploadedAt || new Date().toISOString(),
+    ...fields
+  };
+
+  if(isUuid(id)){
+    const { data, error } = await supabaseClient
+      .from('media_library')
+      .update(fields)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    if(error) throw error;
+    if(data) return;
+  }
+
+  if(file.url){
+    const { data, error } = await supabaseClient
+      .from('media_library')
+      .update(fields)
+      .eq('url', file.url)
+      .select('id')
+      .maybeSingle();
+    if(error) throw error;
+    if(data){
+      file.id = data.id;
+      saveMediaLibrary();
+      return;
+    }
+  }
+
+  const { data, error } = await supabaseClient
     .from('media_library')
-    .delete()
-    .eq('id', id)
-    .then(({ error }) => {
-      if(error) console.warn('Không xóa được file Media Library trên Supabase:', error);
-    });
+    .insert(payload)
+    .select('id')
+    .single();
+  if(error) throw error;
+  file.id = data.id;
+  saveMediaLibrary();
+}
+
+async function deleteMediaFileFromSupabase(id){
+  const file = mediaLibrary.files.find(item => item.id === id);
+  if(isUuid(id)){
+    const { error } = await supabaseClient.from('media_library').delete().eq('id', id);
+    if(error) throw error;
+    return;
+  }
+  if(file && file.url){
+    const { error } = await supabaseClient.from('media_library').delete().eq('url', file.url);
+    if(error) throw error;
+  }
 }
 
 function renderMediaLibrary(){
@@ -1319,7 +1391,7 @@ function renderMediaFolders(){
   `).join('');
   $('mediaFolderTree').innerHTML = folders.map(folder => `
     <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''}">
-      <button onclick="selectMediaFolder('${escapeJs(folder)}')">${folder === 'all' ? 'Tất cả thư mục' : escapeHtml(folder)}</button>
+      <button onclick="selectMediaFolder('${escapeJs(folder)}')">${renderFolderLabel(folder)}</button>
       ${folder === 'all' ? '' : `
         <button class="folder-edit" title="Đổi tên thư mục" onclick="renameMediaFolder('${escapeJs(folder)}')">✎</button>
         <button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>
@@ -1328,15 +1400,30 @@ function renderMediaFolders(){
   `).join('');
 }
 
+function renderFolderLabel(folder){
+  if(folder === 'all') return '<span class="folder-main">Tất cả thư mục</span>';
+  const parts = String(folder || '').split('/').filter(Boolean);
+  const name = parts.pop() || folder;
+  const parent = parts.join(' / ');
+  return `
+    <span class="folder-main" title="${escapeHtml(folder)}">${escapeHtml(name)}</span>
+    ${parent ? `<span class="folder-parent">${escapeHtml(parent)}</span>` : ''}
+  `;
+}
+
 function renderPostMediaFolderOptions(){
   const select = $('postMediaFolder');
   if(!select) return;
   const selected = select.value || '';
   const folders = [...new Set(mediaLibrary.folders || [])];
-  select.innerHTML = '<option value="">Không lưu vào Media Library</option>' + folders.map(folder => `
+  select.innerHTML = '<option value="">Không lưu vào Media Library</option>' + renderFolderOptions(folders, selected);
+  select.value = folders.includes(selected) ? selected : '';
+}
+
+function renderFolderOptions(folders, selected = ''){
+  return folders.map(folder => `
     <option value="${escapeHtml(folder)}" ${folder === selected ? 'selected' : ''}>${escapeHtml(folder)}</option>
   `).join('');
-  select.value = folders.includes(selected) ? selected : '';
 }
 
 function selectMediaFolder(folder){
@@ -1496,6 +1583,7 @@ function renameMediaFolder(folder){
   });
   if(currentMediaFolder === folder) currentMediaFolder = nextFolder;
   saveMediaLibrary();
+  saveMediaFolderToSupabase(nextFolder).catch(err => console.warn('Không lưu được tên thư mục mới lên Supabase:', err));
   updateMediaFolderInSupabase(folder, nextFolder);
   renderMediaLibrary();
 }
@@ -1514,38 +1602,72 @@ function deleteMediaFolder(folder){
   renderMediaLibrary();
 }
 
-function renameMediaFile(id){
+async function renameMediaFile(id){
   const file = mediaLibrary.files.find(item => item.id === id);
   if(!file) return;
   const name = prompt('Tên mới', file.name);
   if(!name) return;
+  const previousName = file.name;
   file.name = name.trim();
-  saveMediaLibrary();
-  updateMediaFileInSupabase(id, { name: file.name });
-  renderMediaLibrary();
+  try{
+    await updateMediaFileInSupabase(id, { name: file.name });
+    saveMediaLibrary();
+    renderMediaLibrary();
+  }catch(err){
+    file.name = previousName;
+    saveMediaLibrary();
+    renderMediaLibrary();
+    alert('Không lưu được tên file lên Supabase: ' + err.message);
+  }
 }
 
 function moveMediaFile(id){
   const file = mediaLibrary.files.find(item => item.id === id);
   if(!file) return;
-  const folder = prompt('Di chuyển tới thư mục', file.folder);
-  if(!folder) return;
-  file.folder = folder.trim();
-  if(!mediaLibrary.folders.includes(file.folder)){
-    mediaLibrary.folders.push(file.folder);
-    saveMediaFolderToSupabase(file.folder).catch(err => console.warn('Không lưu được thư mục lên Supabase:', err));
-  }
-  saveMediaLibrary();
-  updateMediaFileInSupabase(id, { folder: file.folder });
-  renderMediaLibrary();
+  movingMediaFileId = id;
+  $('moveMediaFolder').innerHTML = renderFolderOptions(mediaLibrary.folders || [], file.folder);
+  $('moveMediaFolder').value = mediaLibrary.folders.includes(file.folder) ? file.folder : (mediaLibrary.folders[0] || '');
+  $('moveMediaModal').classList.add('open');
 }
 
-function deleteMediaFile(id){
+function closeMoveMediaModal(){
+  movingMediaFileId = null;
+  $('moveMediaModal').classList.remove('open');
+}
+
+async function confirmMoveMediaFile(){
+  const file = mediaLibrary.files.find(item => item.id === movingMediaFileId);
+  const folder = $('moveMediaFolder').value;
+  if(!file || !folder) return;
+  const previousFolder = file.folder;
+  file.folder = folder;
+  try{
+    await updateMediaFileInSupabase(movingMediaFileId, { folder: file.folder });
+    saveMediaLibrary();
+    closeMoveMediaModal();
+    renderMediaLibrary();
+  }catch(err){
+    file.folder = previousFolder;
+    saveMediaLibrary();
+    renderMediaLibrary();
+    alert('Không lưu được thư mục mới lên Supabase: ' + err.message);
+  }
+}
+
+async function deleteMediaFile(id){
   if(!confirm('Xóa tài nguyên khỏi Media Library?')) return;
-  mediaLibrary.files = mediaLibrary.files.filter(file => file.id !== id);
-  saveMediaLibrary();
-  deleteMediaFileFromSupabase(id);
-  renderMediaLibrary();
+  const previousFiles = [...mediaLibrary.files];
+  try{
+    await deleteMediaFileFromSupabase(id);
+    mediaLibrary.files = mediaLibrary.files.filter(file => file.id !== id);
+    saveMediaLibrary();
+    renderMediaLibrary();
+  }catch(err){
+    mediaLibrary.files = previousFiles;
+    saveMediaLibrary();
+    renderMediaLibrary();
+    alert('Không xóa được file trên Supabase: ' + err.message);
+  }
 }
 
 function downloadMediaFile(id){
