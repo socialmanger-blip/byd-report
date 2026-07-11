@@ -12,6 +12,8 @@ const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
 const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
 const mediaLibraryStorageKey = 'socialhub_media_library_v1';
+const photoSopGuideStorageKey = 'socialhub_photo_sop_guide_v1';
+const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
@@ -82,6 +84,8 @@ let googleMapShowrooms = JSON.parse(JSON.stringify(defaultGoogleMapShowrooms));
 let channelAccounts = createDefaultChannelAccounts();
 let monthlyKpis = {};
 let mediaLibrary = { folders: defaultMediaFolders(), files: [] };
+let photoSopGuide = loadPhotoSopGuide();
+let photoSopSaveTimer = null;
 let currentMediaFolder = 'all';
 let movingMediaFileId = null;
 let selectedLibraryMediaUrls = [];
@@ -183,6 +187,9 @@ function bindEvents(){
   $('btnResetExportFields').addEventListener('click', resetExportFields);
   $('btnResetGoogleReport').addEventListener('click', resetGoogleMapReport);
   $('btnOpenMediaLibrary').addEventListener('click', openMediaLibrary);
+  $('btnOpenPhotoSop').addEventListener('click', openPhotoSopReference);
+  $('btnAddSopItem').addEventListener('click', addPhotoSopItem);
+  $('btnResetSopGuide').addEventListener('click', resetPhotoSopGuide);
   $('btnCreateMediaFolder').addEventListener('click', createMediaFolder);
   $('btnMediaUpload').addEventListener('click', () => $('mediaUploadInput').click());
   $('mediaUploadInput').addEventListener('change', (e) => uploadMediaLibraryFiles(Array.from(e.target.files || [])));
@@ -268,17 +275,228 @@ function setActiveShowroomNav(showroom){
 }
 
 function openMediaLibrary(){
-  document.querySelectorAll('.nav,.showroom-nav').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.nav,.showroom-nav,.library-nav').forEach(btn => btn.classList.remove('active'));
   $('btnOpenMediaLibrary').classList.add('active');
   $('mediaLibrary').classList.add('is-visible');
+  $('photoSopReference').classList.remove('is-visible');
   document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
   renderMediaLibrary();
 }
 
-function closeMediaLibraryView(){
-  $('btnOpenMediaLibrary').classList.remove('active');
+function openPhotoSopReference(){
+  document.querySelectorAll('.nav,.showroom-nav,.library-nav').forEach(btn => btn.classList.remove('active'));
+  $('btnOpenPhotoSop').classList.add('active');
+  $('photoSopReference').classList.add('is-visible');
   $('mediaLibrary').classList.remove('is-visible');
+  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
+  renderPhotoSopGuide();
+}
+
+function closeMediaLibraryView(){
+  document.querySelectorAll('.library-nav').forEach(btn => btn.classList.remove('active'));
+  $('mediaLibrary').classList.remove('is-visible');
+  $('photoSopReference').classList.remove('is-visible');
   document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.remove('is-hidden'));
+}
+
+function defaultPhotoSopGuide(){
+  return [
+    { id:'overview', title:'Toàn cảnh sự kiện', minimum:5, note:'Chụp sân khấu, khu vực xe trưng bày, backdrop, khách tham dự và tổng thể không gian.' },
+    { id:'checkin', title:'Check-in khách hàng', minimum:5, note:'Ưu tiên ảnh khách nhìn rõ mặt, có backdrop/logo BYD NEG, không để hậu cảnh rối.' },
+    { id:'consulting', title:'Tư vấn khách hàng', minimum:10, note:'Chụp TVBH đang giới thiệu xe, giải thích tính năng, trao đổi trực tiếp với khách.' },
+    { id:'car-detail', title:'Xe và chi tiết xe', minimum:20, note:'Gồm chính diện, góc 45 độ, hông xe, đuôi xe, nội thất, logo, đèn, mâm và cốp.' },
+    { id:'test-drive', title:'Lái thử / trải nghiệm', minimum:20, note:'Chụp xe đang chạy, khách lên/xuống xe, TVBH hướng dẫn và khoảnh khắc trải nghiệm thực tế.' },
+    { id:'gift', title:'Trao quà', minimum:5, note:'Ảnh khách nhận quà, đại diện showroom trao quà, logo/ấn phẩm xuất hiện rõ.' },
+    { id:'group', title:'Group photo', minimum:3, note:'Chụp tập thể cuối chương trình, ưu tiên ảnh ngang, đầy đủ người và xe/backdrop.' },
+    { id:'video', title:'Video ngắn', minimum:5, note:'Quay các đoạn 5-10 giây: drone/toàn cảnh, check-in, tư vấn, lái thử, phỏng vấn, trao quà.' }
+  ];
+}
+
+function loadPhotoSopGuide(){
+  try{
+    const saved = localStorage.getItem(photoSopGuideStorageKey);
+    if(saved){
+      const parsed = JSON.parse(saved);
+      if(Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  }catch(err){
+    console.warn('Không đọc được SOP chụp ảnh:', err);
+  }
+  return defaultPhotoSopGuide();
+}
+
+function savePhotoSopGuide(){
+  localStorage.setItem(photoSopGuideStorageKey, JSON.stringify(photoSopGuide));
+  if(appReady && currentUser){
+    clearTimeout(photoSopSaveTimer);
+    photoSopSaveTimer = setTimeout(() => {
+      savePhotoSopGuideToSupabase().catch(err => console.warn('Không lưu được SOP chụp ảnh lên Supabase:', err));
+    }, 650);
+  }
+}
+
+async function loadPhotoSopGuideFromSupabase(){
+  const { data, error } = await supabaseClient
+    .from('media_library')
+    .select('*')
+    .eq('type', 'photo_sop_guide')
+    .order('uploaded_at', { ascending:false })
+    .limit(1);
+  if(error){
+    console.warn('Không đọc được SOP chụp ảnh từ Supabase:', error);
+    return;
+  }
+  const row = data && data[0];
+  if(!row || !row.name){
+    await savePhotoSopGuideToSupabase();
+    return;
+  }
+  try{
+    const parsed = JSON.parse(row.name);
+    if(Array.isArray(parsed) && parsed.length){
+      photoSopGuide = parsed;
+      localStorage.setItem(photoSopGuideStorageKey, JSON.stringify(photoSopGuide));
+    }
+  }catch(err){
+    console.warn('Dữ liệu SOP chụp ảnh trên Supabase không hợp lệ:', err);
+  }
+}
+
+async function savePhotoSopGuideToSupabase(){
+  const payload = {
+    name: JSON.stringify(photoSopGuide),
+    folder: photoSopFolderRoot,
+    url: '#photo-sop-guide',
+    type: 'photo_sop_guide',
+    size: 0,
+    uploaded_at: new Date().toISOString()
+  };
+  const { error: deleteError } = await supabaseClient
+    .from('media_library')
+    .delete()
+    .eq('type', 'photo_sop_guide');
+  if(deleteError) throw deleteError;
+  const { error } = await supabaseClient.from('media_library').insert(payload);
+  if(error) throw error;
+}
+
+function getPhotoSopFolder(item){
+  return `${photoSopFolderRoot}/${item.title}`;
+}
+
+function getPhotoSopFiles(item){
+  const folder = getPhotoSopFolder(item);
+  return (mediaLibrary.files || []).filter(file => file.folder === folder);
+}
+
+function renderPhotoSopGuide(){
+  const wrap = $('photoSopGuideList');
+  if(!wrap) return;
+  const total = photoSopGuide.reduce((sum, item) => sum + toNumber(item.minimum), 0);
+  $('sopTotalShots').innerText = total;
+  wrap.innerHTML = photoSopGuide.map((item, index) => {
+    const files = getPhotoSopFiles(item);
+    return `
+      <article class="sop-guide-item">
+        <div class="sop-guide-main">
+          <div class="sop-guide-number">${String(index + 1).padStart(2, '0')}</div>
+          <div>
+            <h4>${escapeHtml(item.title)}</h4>
+            <label>Số lượng tối thiểu
+              <input type="number" min="0" value="${escapeHtml(item.minimum)}" onchange="updatePhotoSopItem('${escapeJs(item.id)}','minimum',this.value)">
+            </label>
+          </div>
+        </div>
+        <div class="sop-upload-box">
+          <div class="sop-upload-head">
+            <b>Ảnh mẫu</b>
+            <label class="sop-upload-btn">
+              Upload ảnh
+              <input type="file" accept="image/*" multiple onchange="uploadPhotoSopExamples('${escapeJs(item.id)}', this.files); this.value='';">
+            </label>
+          </div>
+          <div class="sop-example-grid">
+            ${files.length ? files.map(file => `
+              <div class="sop-example">
+                <button type="button" onclick="previewMedia('${escapeJs(file.url)}','${escapeJs(file.type)}')">
+                  ${renderMediaThumb(file)}
+                </button>
+                <button type="button" class="sop-example-delete" onclick="deletePhotoSopExample('${escapeJs(file.id)}')">Xóa</button>
+              </div>
+            `).join('') : '<div class="sop-empty">Chưa có ảnh mẫu</div>'}
+          </div>
+        </div>
+        <label class="sop-note-label">Ghi chú hướng dẫn
+          <textarea placeholder="Nhập lưu ý để mọi người đọc..." oninput="updatePhotoSopItem('${escapeJs(item.id)}','note',this.value)">${escapeHtml(item.note || '')}</textarea>
+        </label>
+        <div class="sop-item-actions">
+          <button type="button" onclick="deletePhotoSopItem('${escapeJs(item.id)}')">Xóa mục</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function updatePhotoSopItem(id, field, value){
+  const item = photoSopGuide.find(entry => entry.id === id);
+  if(!item) return;
+  item[field] = field === 'minimum' ? Math.max(0, toNumber(value)) : value;
+  savePhotoSopGuide();
+  if(field === 'minimum') renderPhotoSopGuide();
+}
+
+async function uploadPhotoSopExamples(id, fileList){
+  const item = photoSopGuide.find(entry => entry.id === id);
+  const files = Array.from(fileList || []);
+  if(!item || !files.length) return;
+  const folder = getPhotoSopFolder(item);
+  try{
+    for(const file of files){
+      await uploadFileToMediaLibrary(file, folder);
+    }
+    saveMediaLibrary();
+    renderPhotoSopGuide();
+  }catch(err){
+    console.error(err);
+    alert('Không upload được ảnh mẫu: ' + err.message);
+  }
+}
+
+function addPhotoSopItem(){
+  const title = prompt('Tên mục cần chụp');
+  if(!title) return;
+  const minimum = prompt('Số lượng ảnh tối thiểu', '5');
+  const cleanTitle = title.trim();
+  if(!cleanTitle) return;
+  photoSopGuide.push({
+    id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: cleanTitle,
+    minimum: Math.max(0, toNumber(minimum)),
+    note: ''
+  });
+  savePhotoSopGuide();
+  renderPhotoSopGuide();
+}
+
+function deletePhotoSopItem(id){
+  const item = photoSopGuide.find(entry => entry.id === id);
+  if(!item) return;
+  if(!confirm(`Xóa mục "${item.title}" khỏi quy định chụp ảnh? Ảnh mẫu đã upload trong Media Library vẫn được giữ lại.`)) return;
+  photoSopGuide = photoSopGuide.filter(entry => entry.id !== id);
+  savePhotoSopGuide();
+  renderPhotoSopGuide();
+}
+
+async function deletePhotoSopExample(fileId){
+  await deleteMediaFile(fileId);
+  renderPhotoSopGuide();
+}
+
+function resetPhotoSopGuide(){
+  if(!confirm('Đặt lại danh sách quy định chụp ảnh về mẫu mặc định?')) return;
+  photoSopGuide = defaultPhotoSopGuide();
+  savePhotoSopGuide();
+  renderPhotoSopGuide();
 }
 
 async function loadPosts(){
@@ -992,7 +1210,8 @@ async function loadCloudData(){
     loadGoogleBusinessFromSupabase(),
     loadChannelAccountsFromSupabase(),
     loadMonthlyKpisFromSupabase(),
-    loadMediaLibraryFromSupabase()
+    loadMediaLibraryFromSupabase(),
+    loadPhotoSopGuideFromSupabase()
   ]);
   results.forEach(result => {
     if(result.status === 'rejected') console.warn('Có dữ liệu chưa đồng bộ được từ Supabase:', result.reason);
@@ -1235,7 +1454,7 @@ async function loadMediaLibraryFromSupabase(){
     .map(row => row.folder)
     .filter(Boolean);
   const files = data
-    .filter(row => row.type !== 'folder')
+    .filter(row => row.type !== 'folder' && row.type !== 'photo_sop_guide')
     .map(row => ({
       id: row.id,
       name: row.name || 'Tệp chưa đặt tên',

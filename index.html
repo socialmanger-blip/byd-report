@@ -39,6 +39,7 @@
       <button class="nav" data-platform="Google Maps">Google Maps</button>
       <div class="nav-title">Kho tài nguyên</div>
       <button class="library-nav" id="btnOpenMediaLibrary">Media Library</button>
+      <button class="library-nav" id="btnOpenPhotoSop">SOP Chụp ảnh</button>
       <div class="nav-title">Showroom</div>
       <button class="showroom-nav active" data-showroom="all">Tất cả showroom</button>
       <button class="showroom-nav" data-showroom="HO">Trụ sở chính</button>
@@ -233,6 +234,27 @@
           <aside class="media-tree" id="mediaFolderTree"></aside>
           <div class="media-grid" id="mediaGrid"></div>
         </div>
+      </section>
+
+      <section class="sop-reference" id="photoSopReference">
+        <div class="sop-hero sop-simple-hero">
+          <div>
+            <span class="sop-kicker">Quy định chụp ảnh truyền thông</span>
+            <h3>Shot list sự kiện Test Drive</h3>
+            <p>Mỗi mục có số lượng ảnh tối thiểu, ảnh mẫu để team hình dung và ghi chú hướng dẫn bên dưới.</p>
+          </div>
+          <div class="sop-total">
+            <b id="sopTotalShots">0</b>
+            <span>ảnh tối thiểu</span>
+          </div>
+        </div>
+
+        <div class="sop-guide-toolbar">
+          <button type="button" class="primary" id="btnAddSopItem">+ Thêm mục chụp</button>
+          <button type="button" id="btnResetSopGuide">Đặt lại mẫu</button>
+        </div>
+
+        <div class="sop-guide-list" id="photoSopGuideList"></div>
       </section>
 
       <div class="table-wrap post-content">
