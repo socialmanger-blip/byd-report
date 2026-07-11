@@ -536,7 +536,14 @@ function csvList(value){
 }
 
 function platformList(value){ return csvList(value); }
-function showroomList(value){ return csvList(value); }
+function normalizeShowroomKey(value){
+  const text = String(value || '').trim();
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if(['ho', 'hq'].includes(normalized) || normalized.includes('tru so') || normalized.includes('viet nam')) return 'HO';
+  return text;
+}
+
+function showroomList(value){ return csvList(value).map(normalizeShowroomKey); }
 
 function platformMatches(value, platform){
   if(platform === 'all') return true;
@@ -545,11 +552,11 @@ function platformMatches(value, platform){
 
 function showroomMatches(value, showroom){
   if(showroom === 'all') return true;
-  return showroomList(value).includes(showroom);
+  return showroomList(value).includes(normalizeShowroomKey(showroom));
 }
 
 function showroomDisplayName(showroom){
-  return showroom === 'HO' ? 'BYD NEG Việt Nam' : `BYD NEG ${showroom}`;
+  return normalizeShowroomKey(showroom) === 'HO' ? 'Trụ sở chính' : `BYD NEG ${showroom}`;
 }
 
 function getImageUrls(post){
@@ -879,7 +886,13 @@ function setChannelAccountLocal(platform, showroom, link, avatar){
 }
 
 function getGoogleMapInfoForShowroom(showroom){
-  return googleMapShowrooms.find(item => item.name.includes(showroom)) || {
+  const key = normalizeShowroomKey(showroom);
+  const found = googleMapShowrooms.find(item => {
+    const name = String(item.name || '');
+    if(key === 'HO') return showroomKeyFromGoogleName(name) === 'Trụ sở chính';
+    return name.includes(key);
+  });
+  return found || {
     reviews: 0,
     target: 0,
     mapLink: ''
@@ -891,7 +904,12 @@ function handleShowroomDashboardLink(event){
   const showroom = event.target.dataset.dashboardLinkShowroom;
   const link = event.target.value.trim();
   if(platform === 'Google Maps'){
-    const info = googleMapShowrooms.find(item => item.name.includes(showroom));
+    const key = normalizeShowroomKey(showroom);
+    const info = googleMapShowrooms.find(item => {
+      const name = String(item.name || '');
+      if(key === 'HO') return showroomKeyFromGoogleName(name) === 'Trụ sở chính';
+      return name.includes(key);
+    });
     if(info){
       info.mapLink = link;
       saveGoogleMapShowrooms();
@@ -2178,7 +2196,7 @@ function updateStats(){
   renderKeyValueStats('weekStats', weeks);
 
   renderKeyValueStats('platformStats', countBy(monthPosts, p => platformList(p.platform || 'Khác')));
-  renderKeyValueStats('showroomStats', countBy(monthPosts, p => showroomList(p.showroom || 'Chưa chọn')));
+  renderKeyValueStats('showroomStats', countBy(monthPosts, p => showroomList(p.showroom || 'Chưa chọn').map(showroomDisplayName)));
   renderDailyTrend(monthPosts);
 }
 
