@@ -108,6 +108,10 @@ const defaultExportFields = [
 let exportFields = JSON.parse(JSON.stringify(defaultExportFields));
 
 const $ = (id) => document.getElementById(id);
+const bindClick = (id, handler) => {
+  const el = $(id);
+  if(el) el.addEventListener('click', handler);
+};
 
 window.addEventListener('DOMContentLoaded', async () => {
   bindAuthEvents();
@@ -174,24 +178,24 @@ async function startApp(session){
 }
 
 function bindEvents(){
-  $('btnOpenModal').addEventListener('click', () => openModal());
-  $('btnCloseModal').addEventListener('click', closeModal);
-  $('btnCancel').addEventListener('click', closeModal);
-  $('btnSave').addEventListener('click', savePost);
-  $('btnReload').addEventListener('click', loadPosts);
-  $('btnOpenExport').addEventListener('click', openExportModal);
-  $('btnOpenExportTop').addEventListener('click', openExportModal);
-  $('btnCloseExport').addEventListener('click', closeExportModal);
-  $('btnCancelExport').addEventListener('click', closeExportModal);
-  $('btnExportExcel').addEventListener('click', exportExcel);
-  $('btnResetExportFields').addEventListener('click', resetExportFields);
-  $('btnResetGoogleReport').addEventListener('click', resetGoogleMapReport);
-  $('btnOpenMediaLibrary').addEventListener('click', openMediaLibrary);
-  $('btnOpenPhotoSop').addEventListener('click', openPhotoSopReference);
-  $('btnAddSopItem').addEventListener('click', addPhotoSopItem);
-  $('btnResetSopGuide').addEventListener('click', resetPhotoSopGuide);
-  $('btnCreateMediaFolder').addEventListener('click', createMediaFolder);
-  $('btnMediaUpload').addEventListener('click', () => $('mediaUploadInput').click());
+  bindClick('btnOpenModal', () => openModal());
+  bindClick('btnCloseModal', closeModal);
+  bindClick('btnCancel', closeModal);
+  bindClick('btnSave', savePost);
+  bindClick('btnReload', loadPosts);
+  bindClick('btnOpenExport', openExportModal);
+  bindClick('btnOpenExportTop', openExportModal);
+  bindClick('btnCloseExport', closeExportModal);
+  bindClick('btnCancelExport', closeExportModal);
+  bindClick('btnExportExcel', exportExcel);
+  bindClick('btnResetExportFields', resetExportFields);
+  bindClick('btnResetGoogleReport', resetGoogleMapReport);
+  bindClick('btnOpenMediaLibrary', openMediaLibrary);
+  bindClick('btnOpenPhotoSop', openPhotoSopReference);
+  bindClick('btnAddSopItem', addPhotoSopItem);
+  bindClick('btnResetSopGuide', resetPhotoSopGuide);
+  bindClick('btnCreateMediaFolder', createMediaFolder);
+  bindClick('btnMediaUpload', () => $('mediaUploadInput').click());
   $('mediaUploadInput').addEventListener('change', (e) => uploadMediaLibraryFiles(Array.from(e.target.files || [])));
   $('mediaSearch').addEventListener('input', renderMediaLibrary);
   $('mediaFolderFilter').addEventListener('change', (e) => { currentMediaFolder = e.target.value; renderMediaLibrary(); });
