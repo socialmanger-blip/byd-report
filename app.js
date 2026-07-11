@@ -87,6 +87,7 @@ let mediaLibrary = { folders: defaultMediaFolders(), files: [] };
 let photoSopGuide = loadPhotoSopGuide();
 let photoSopSaveTimer = null;
 let currentMediaFolder = 'all';
+let expandedMediaFolders = new Set();
 let movingMediaFileId = null;
 let selectedLibraryMediaUrls = [];
 let pendingPickedMedia = new Set();
@@ -1618,16 +1619,51 @@ function renderMediaFolders(){
   $('mediaFolderFilter').innerHTML = folders.map(folder => `
     <option value="${escapeHtml(folder)}" ${folder === currentMediaFolder ? 'selected' : ''}>${folder === 'all' ? 'Tất cả thư mục' : escapeHtml(folder)}</option>
   `).join('');
-  $('mediaFolderTree').innerHTML = folders.map(folder => `
-    <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''}">
-      <button onclick="selectMediaFolder('${escapeJs(folder)}')">${renderFolderLabel(folder)}</button>
-      ${folder === 'all' ? '' : `
+  $('mediaFolderTree').innerHTML = buildMediaFolderTreeHtml(mediaLibrary.folders || []);
+}
+
+function buildMediaFolderTreeHtml(folders){
+  const tree = {};
+  folders.forEach(folder => {
+    const parts = String(folder || '').split('/').filter(Boolean);
+    if(!parts.length) return;
+    let level = tree;
+    parts.forEach((part, index) => {
+      const path = parts.slice(0, index + 1).join('/');
+      if(!level[part]) level[part] = { name: part, path, children: {} };
+      level = level[part].children;
+    });
+  });
+  return `
+    ${renderMediaFolderTreeRow('all', 'Tất cả thư mục', 0, false)}
+    ${Object.values(tree).map(node => renderMediaFolderNode(node, 0)).join('')}
+  `;
+}
+
+function renderMediaFolderNode(node, depth){
+  const children = Object.values(node.children || {});
+  const isOpen = expandedMediaFolders.has(node.path) || currentMediaFolder === node.path || currentMediaFolder.startsWith(`${node.path}/`);
+  return `
+    ${renderMediaFolderTreeRow(node.path, node.name, depth, children.length > 0, isOpen)}
+    ${children.length && isOpen ? children.map(child => renderMediaFolderNode(child, depth + 1)).join('') : ''}
+  `;
+}
+
+function renderMediaFolderTreeRow(folder, label, depth, hasChildren = false, isOpen = false){
+  return `
+    <div class="media-folder-row ${folder === currentMediaFolder ? 'active' : ''} ${depth ? 'is-child' : ''}" style="--folder-depth:${depth}">
+      <button class="folder-toggle ${hasChildren ? '' : 'is-placeholder'}" title="${isOpen ? 'Thu gọn' : 'Mở thư mục con'}" onclick="toggleMediaFolder('${escapeJs(folder)}')">${hasChildren ? (isOpen ? '⌄' : '›') : ''}</button>
+      <button class="folder-name-btn" onclick="selectMediaFolder('${escapeJs(folder)}')" title="${escapeHtml(folder)}">
+        <span class="folder-main">${escapeHtml(label)}</span>
+        ${depth ? `<span class="folder-parent">${escapeHtml(String(folder).split('/').slice(0, -1).join(' / '))}</span>` : ''}
+      </button>
+      ${folder === 'all' ? '<span></span><span></span><span></span>' : `
         <button class="folder-add" title="Tạo thư mục con" onclick="createMediaFolder('${escapeJs(folder)}')">+</button>
         <button class="folder-edit" title="Đổi tên thư mục" onclick="renameMediaFolder('${escapeJs(folder)}')">✎</button>
         <button class="folder-delete" title="Xóa thư mục" onclick="deleteMediaFolder('${escapeJs(folder)}')">×</button>
       `}
     </div>
-  `).join('');
+  `;
 }
 
 function renderFolderLabel(folder){
@@ -1658,7 +1694,23 @@ function renderFolderOptions(folders, selected = ''){
 
 function selectMediaFolder(folder){
   currentMediaFolder = folder;
+  expandFolderAncestors(folder);
   renderMediaLibrary();
+}
+
+function toggleMediaFolder(folder){
+  if(!folder || folder === 'all') return;
+  if(expandedMediaFolders.has(folder)) expandedMediaFolders.delete(folder);
+  else expandedMediaFolders.add(folder);
+  renderMediaFolders();
+}
+
+function expandFolderAncestors(folder){
+  const parts = String(folder || '').split('/').filter(Boolean);
+  parts.pop();
+  parts.forEach((_part, index) => {
+    expandedMediaFolders.add(parts.slice(0, index + 1).join('/'));
+  });
 }
 
 function getFilteredMediaFiles(){
@@ -1797,6 +1849,8 @@ function createMediaFolder(parentFolder = ''){
   if(!folder) return;
   if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
   currentMediaFolder = folder;
+  if(baseFolder) expandedMediaFolders.add(baseFolder);
+  expandFolderAncestors(folder);
   saveMediaLibrary();
   saveMediaFolderToSupabase(folder).catch(err => console.warn('Không lưu được thư mục lên Supabase:', err));
   renderMediaLibrary();
