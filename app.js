@@ -556,7 +556,7 @@ function showroomMatches(value, showroom){
 }
 
 function showroomDisplayName(showroom){
-  return normalizeShowroomKey(showroom) === 'HO' ? 'Trụ sở chính' : `BYD NEG ${showroom}`;
+  return normalizeShowroomKey(showroom) === 'HO' ? 'BYD NEG Việt Nam' : `BYD NEG ${showroom}`;
 }
 
 function getImageUrls(post){
