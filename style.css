@@ -3948,3 +3948,21 @@ tbody tr:hover {
     display: grid;
   }
 }
+
+/* Hotfix: make account overview counters visible on light metric cards */
+.account-card .channel-metrics div,
+.showroom-channel-card .channel-metrics div {
+  border: 1px solid rgba(34, 211, 238, .28) !important;
+  background: rgba(8, 18, 33, .92) !important;
+}
+
+.account-card .channel-metrics b,
+.showroom-channel-card .channel-metrics b {
+  color: #67e8f9 !important;
+  text-shadow: 0 0 18px rgba(34, 211, 238, .24);
+}
+
+.account-card .channel-metrics span,
+.showroom-channel-card .channel-metrics span {
+  color: #cbd5e1 !important;
+}
