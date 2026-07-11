@@ -720,10 +720,10 @@ function renderShowroomDashboard(){
     const linkLabel = platform === 'Google Maps' ? 'Link Google Maps' : 'Link account';
     const openLabel = platform === 'Google Maps' ? 'Mở map' : 'Mở account';
     const extraMetric = googleInfo
-      ? `<div><b>${toNumber(googleInfo.reviews)}</b><span>Đánh giá</span></div>
-         <div><b>${toNumber(googleInfo.target)}</b><span>Target review</span></div>`
-      : `<div><b>${pending}</b><span>Chờ duyệt</span></div>
-         <div><b>${idea}</b><span>Ý tưởng</span></div>`;
+      ? `${renderMetricBox(toNumber(googleInfo.reviews), 'Đánh giá')}
+         ${renderMetricBox(toNumber(googleInfo.target), 'Target review')}`
+      : `${renderMetricBox(pending, 'Chờ duyệt')}
+         ${renderMetricBox(idea, 'Ý tưởng')}`;
     return `
       <article class="showroom-channel-card ${isActiveChannel ? 'is-current' : ''}">
         <div class="channel-head">
@@ -731,8 +731,8 @@ function renderShowroomDashboard(){
           <button type="button" class="mini-primary" data-create-platform="${escapeHtml(platform)}" data-create-showroom="${escapeHtml(currentShowroom)}">+ Tạo bài</button>
         </div>
         <div class="channel-metrics">
-          <div><b>${channelPosts.length}</b><span>Tổng bài</span></div>
-          <div><b>${done}</b><span>Đã đăng</span></div>
+          ${renderMetricBox(channelPosts.length, 'Tổng bài')}
+          ${renderMetricBox(done, 'Đã đăng')}
           ${extraMetric}
         </div>
         <label>${linkLabel}
@@ -920,6 +920,15 @@ function handleShowroomDashboardLink(event){
   renderShowroomDashboard();
 }
 
+function renderMetricBox(value, label){
+  return `
+    <div style="background:rgba(8,18,33,.92);border:1px solid rgba(34,211,238,.28);border-radius:10px;padding:10px;">
+      <b style="display:block;margin-bottom:3px;color:#67e8f9;font-size:20px;font-weight:900;text-shadow:0 0 18px rgba(34,211,238,.24);">${escapeHtml(value)}</b>
+      <span style="color:#cbd5e1;font-size:12px;font-weight:800;">${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
 function renderChannelAccounts(){
   const section = $('channelAccounts');
   const target = $('channelAccountGrid');
@@ -956,10 +965,10 @@ function renderChannelAccounts(){
           </div>
         </div>
         <div class="channel-metrics">
-          <div><b>${channelPosts.length}</b><span>Tổng bài</span></div>
-          <div><b>${done}</b><span>Đã đăng</span></div>
-          <div><b>${pending}</b><span>Chờ duyệt</span></div>
-          <div><b>${idea}</b><span>Ý tưởng</span></div>
+          ${renderMetricBox(channelPosts.length, 'Tổng bài')}
+          ${renderMetricBox(done, 'Đã đăng')}
+          ${renderMetricBox(pending, 'Chờ duyệt')}
+          ${renderMetricBox(idea, 'Ý tưởng')}
         </div>
         <label>Link account
           <input type="url" placeholder="Dán link ${escapeHtml(currentPlatform)}" value="${escapeHtml(link)}" data-account-showroom="${escapeHtml(showroom)}">
