@@ -1156,6 +1156,7 @@ textarea:focus {
 .channel-metrics b {
   display: block;
   margin-bottom: 3px;
+  color: var(--ink);
   font-size: 20px;
 }
 
@@ -3401,6 +3402,19 @@ textarea:focus {
 .channel-metrics b,
 .review-metrics b {
   color: #f8fcff;
+}
+
+.showroom-channel-card .channel-metrics div {
+  border: 1px solid rgba(96, 165, 250, .22);
+  background: rgba(8, 18, 33, .72);
+}
+
+.showroom-channel-card .channel-metrics b {
+  color: #f8fcff;
+}
+
+.showroom-channel-card .channel-metrics span {
+  color: var(--tech-muted);
 }
 
 .bi-dashboard .report-panel h4,
