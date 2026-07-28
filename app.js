@@ -8,6 +8,7 @@ let editingMediaUrls = [];
 let appReady = false;
 let currentUser = null;
 let periodPickerDisplayYear = new Date().getFullYear();
+let cloudPostMetricsFallback = {};
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -551,9 +552,12 @@ async function loadPosts(){
     $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
+  await loadCloudPostMetricsFallback();
   posts = (data || []).map(post => ({
     ...post,
-    performance_metrics: post.performance_metrics || getFallbackPostMetrics(post)
+    performance_metrics: Object.keys(normalizePerformanceMetrics(post.performance_metrics)).length
+      ? post.performance_metrics
+      : getFallbackPostMetrics(post)
   }));
   updateYearFilter();
   setStatus('Đã kết nối Supabase. Dữ liệu đang lưu online.', true);
@@ -669,13 +673,47 @@ function loadFallbackPostMetrics(){
 }
 
 function getFallbackPostMetrics(post){
-  return loadFallbackPostMetrics()[postMetricsFallbackKey(post)] || {};
+  const key = postMetricsFallbackKey(post);
+  return cloudPostMetricsFallback[key] || loadFallbackPostMetrics()[key] || {};
 }
 
-function saveFallbackPostMetrics(post, metrics){
+async function loadCloudPostMetricsFallback(){
+  const { data, error } = await supabaseClient
+    .from('media_library')
+    .select('name,folder')
+    .eq('type', 'post_metrics');
+  if(error){
+    console.warn('Không tải được KPI dự phòng từ Supabase:', error);
+    return;
+  }
+  cloudPostMetricsFallback = (data || []).reduce((acc, row) => {
+    try { acc[row.folder] = normalizePerformanceMetrics(JSON.parse(row.name || '{}')); }
+    catch(_err) { acc[row.folder] = {}; }
+    return acc;
+  }, {});
+}
+
+async function saveFallbackPostMetrics(post, metrics){
+  const key = postMetricsFallbackKey(post);
   const saved = loadFallbackPostMetrics();
-  saved[postMetricsFallbackKey(post)] = metrics;
+  saved[key] = metrics;
   localStorage.setItem(fallbackPostMetricsStorageKey, JSON.stringify(saved));
+  cloudPostMetricsFallback[key] = metrics;
+  const { error: deleteError } = await supabaseClient
+    .from('media_library')
+    .delete()
+    .eq('type', 'post_metrics')
+    .eq('folder', key);
+  if(deleteError) throw deleteError;
+  const { error } = await supabaseClient.from('media_library').insert({
+    name: JSON.stringify(metrics),
+    folder: key,
+    url: '#post-metrics',
+    type: 'post_metrics',
+    size: 0,
+    uploaded_at: new Date().toISOString()
+  });
+  if(error) throw error;
 }
 
 function isMissingPerformanceMetricsColumn(error){
@@ -706,7 +744,6 @@ function renderPerformanceSummary(items){
 }
 
 const engagementMetricNames = new Set([
-  'Lượt tương tác',
   'Lượt thích và cảm xúc',
   'Bình luận',
   'Lượt chia sẻ',
@@ -731,6 +768,7 @@ function updateTopPostsMetricOptions(items){
 function getPostPerformanceValue(post, criterion){
   const metrics = normalizePerformanceMetrics(post.performance_metrics);
   if(criterion !== '__engagement__') return toNumber(metrics[criterion]);
+  if(toNumber(metrics['Lượt tương tác']) > 0) return toNumber(metrics['Lượt tương tác']);
   return Object.entries(metrics).reduce((total, [name, value]) => {
     return total + (engagementMetricNames.has(name) ? toNumber(value) : 0);
   }, 0);
@@ -774,6 +812,78 @@ function renderTopPerformingPosts(items){
           </div>
         </div>
       </article>
+    `;
+  }).join('');
+}
+
+function previousMonthKey(month){
+  if(!month) return '';
+  const [year, number] = month.split('-').map(Number);
+  const date = new Date(year, number - 2, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function postsForComparisonMonth(month){
+  return posts.filter(post => {
+    return getMonthKey(post.post_date) === month
+      && platformMatches(post.platform, currentPlatform)
+      && showroomMatches(post.showroom, currentShowroom);
+  });
+}
+
+function sumMetricAliases(items, aliases){
+  return items.reduce((total, post) => {
+    const metrics = normalizePerformanceMetrics(post.performance_metrics);
+    return total + aliases.reduce((sum, name) => sum + toNumber(metrics[name]), 0);
+  }, 0);
+}
+
+function totalEngagementForPosts(items){
+  return items.reduce((total, post) => total + getPostPerformanceValue(post, '__engagement__'), 0);
+}
+
+function comparisonChange(current, previous){
+  if(previous === 0 && current > 0) return { label:'Mới', type:'new' };
+  if(previous === 0 && current === 0) return { label:'Chưa có dữ liệu', type:'neutral' };
+  const percent = (current - previous) / previous * 100;
+  if(Math.abs(percent) < 0.05) return { label:'0% so với tháng trước', type:'neutral' };
+  return {
+    label:`${percent > 0 ? '↑' : '↓'} ${Math.abs(percent).toLocaleString('vi-VN', { maximumFractionDigits:1 })}% so với tháng trước`,
+    type:percent > 0 ? 'up' : 'down'
+  };
+}
+
+function renderMonthComparison(){
+  const target = $('monthComparison');
+  if(!target) return;
+  const selectedMonth = $('monthFilter').value;
+  if(!selectedMonth){
+    target.innerHTML = '<div class="empty-mini">Hãy chọn một tháng để xem mức tăng hoặc giảm.</div>';
+    return;
+  }
+  const previousMonth = previousMonthKey(selectedMonth);
+  const currentItems = postsForComparisonMonth(selectedMonth);
+  const previousItems = postsForComparisonMonth(previousMonth);
+  const definitions = [
+    { label:'Tổng bài đăng', current:currentItems.length, previous:previousItems.length },
+    { label:'Lượt xem', current:sumMetricAliases(currentItems, ['Lượt xem']), previous:sumMetricAliases(previousItems, ['Lượt xem']) },
+    { label:'Số người tiếp cận', current:sumMetricAliases(currentItems, ['Số người tiếp cận']), previous:sumMetricAliases(previousItems, ['Số người tiếp cận']) },
+    { label:'Tổng tương tác', current:totalEngagementForPosts(currentItems), previous:totalEngagementForPosts(previousItems) },
+    { label:'Click liên kết', current:sumMetricAliases(currentItems, ['Lượt click vào liên kết']), previous:sumMetricAliases(previousItems, ['Lượt click vào liên kết']) },
+    { label:'Lead/Form', current:sumMetricAliases(currentItems, ['Lead', 'Lead/Form', 'Khách hàng tiềm năng']), previous:sumMetricAliases(previousItems, ['Lead', 'Lead/Form', 'Khách hàng tiềm năng']) }
+  ];
+  if($('monthComparisonCaption')){
+    $('monthComparisonCaption').innerText = `Tháng ${Number(selectedMonth.slice(5,7))}/${selectedMonth.slice(0,4)} so với tháng ${Number(previousMonth.slice(5,7))}/${previousMonth.slice(0,4)}`;
+  }
+  target.innerHTML = definitions.map(metric => {
+    const change = comparisonChange(metric.current, metric.previous);
+    return `
+      <div class="comparison-card">
+        <span>${escapeHtml(metric.label)}</span>
+        <b>${formatMetricNumber(metric.current)}</b>
+        <small class="comparison-change is-${change.type}">${escapeHtml(change.label)}</small>
+        <em>Tháng trước: ${formatMetricNumber(metric.previous)}</em>
+      </div>
     `;
   }).join('');
 }
@@ -1670,7 +1780,7 @@ async function loadMediaLibraryFromSupabase(){
     .map(row => row.folder)
     .filter(Boolean);
   const files = data
-    .filter(row => row.type !== 'folder' && row.type !== 'photo_sop_guide')
+    .filter(row => row.type !== 'folder' && row.type !== 'photo_sop_guide' && row.type !== 'post_metrics')
     .map(row => ({
       id: row.id,
       name: row.name || 'Tệp chưa đặt tên',
@@ -2430,6 +2540,7 @@ function updateStats(){
   const monthPosts = getMonthPosts();
   renderPerformanceSummary(monthPosts);
   renderTopPerformingPosts(monthPosts);
+  renderMonthComparison();
   const done = monthPosts.filter(p => p.status === 'Đã đăng').length;
   const pending = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
   const idea = monthPosts.filter(p => p.status === 'Ý tưởng').length;
@@ -2655,6 +2766,7 @@ async function savePost(){
     };
 
     let error;
+    let metricsSavedAsFallback = false;
     if(editingId){
       ({ error } = await supabaseClient.from('posts').update(payload).eq('id', editingId));
     }else{
@@ -2669,9 +2781,17 @@ async function savePost(){
       }else{
         ({ error } = await supabaseClient.from('posts').insert([compatiblePayload]));
       }
-      if(!error) saveFallbackPostMetrics({ ...compatiblePayload, id:editingId || '' }, fallbackMetrics);
+      if(!error){
+        await saveFallbackPostMetrics(compatiblePayload, fallbackMetrics);
+        metricsSavedAsFallback = true;
+      }
     }
     if(error) throw error;
+    if(!metricsSavedAsFallback){
+      await saveFallbackPostMetrics(payload, payload.performance_metrics).catch(err => {
+        console.warn('Không thể tạo bản sao KPI dự phòng:', err);
+      });
+    }
     closeModal();
     await loadPosts();
     alert('Đã lưu thành công');

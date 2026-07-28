@@ -4060,6 +4060,47 @@ tbody tr:hover {
 /* Flexible performance metrics */
 .performance-summary-panel { grid-column: 1 / -1; }
 .top-posts-panel { grid-column: 1 / -1; }
+.month-comparison-panel { grid-column: 1 / -1; }
+.month-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 11px;
+}
+.comparison-card {
+  padding: 14px;
+  border: 1px solid rgba(96, 165, 250, .2);
+  border-radius: 13px;
+  background: rgba(8, 18, 33, .66);
+}
+.comparison-card > span {
+  display: block;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+}
+.comparison-card > b {
+  display: block;
+  margin: 5px 0 6px;
+  color: #f8fcff;
+  font-size: 25px;
+}
+.comparison-card small {
+  display: block;
+  min-height: 18px;
+  font-size: 11px;
+  font-weight: 900;
+}
+.comparison-change.is-up,
+.comparison-change.is-new { color: #34d399; }
+.comparison-change.is-down { color: #f87171; }
+.comparison-change.is-neutral { color: #94a3b8; }
+.comparison-card em {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 10px;
+  font-style: normal;
+}
 .performance-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
