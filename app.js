@@ -14,6 +14,7 @@ const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
 const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
 const mediaLibraryStorageKey = 'socialhub_media_library_v1';
 const photoSopGuideStorageKey = 'socialhub_photo_sop_guide_v1';
+const fallbackPostMetricsStorageKey = 'socialhub_post_metrics_fallback_v1';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
@@ -534,7 +535,10 @@ async function loadPosts(){
     $('postTable').innerHTML = `<tr><td colspan="8" class="empty">Lỗi: ${escapeHtml(error.message)}</td></tr>`;
     return;
   }
-  posts = data || [];
+  posts = (data || []).map(post => ({
+    ...post,
+    performance_metrics: post.performance_metrics || getFallbackPostMetrics(post)
+  }));
   updateYearFilter();
   setStatus('Đã kết nối Supabase. Dữ liệu đang lưu online.', true);
   renderPosts();
@@ -632,6 +636,35 @@ function normalizePerformanceMetrics(value){
     if(String(name).trim()) acc[String(name).trim()] = Math.max(0, toNumber(amount));
     return acc;
   }, {});
+}
+
+function postMetricsFallbackKey(post){
+  return [
+    post.post_date || '',
+    post.title || '',
+    post.platform || '',
+    post.showroom || ''
+  ].join('|');
+}
+
+function loadFallbackPostMetrics(){
+  try { return JSON.parse(localStorage.getItem(fallbackPostMetricsStorageKey) || '{}'); }
+  catch(_err) { return {}; }
+}
+
+function getFallbackPostMetrics(post){
+  return loadFallbackPostMetrics()[postMetricsFallbackKey(post)] || {};
+}
+
+function saveFallbackPostMetrics(post, metrics){
+  const saved = loadFallbackPostMetrics();
+  saved[postMetricsFallbackKey(post)] = metrics;
+  localStorage.setItem(fallbackPostMetricsStorageKey, JSON.stringify(saved));
+}
+
+function isMissingPerformanceMetricsColumn(error){
+  return /performance_metrics/i.test(String(error && error.message || ''))
+    && /(schema cache|column|does not exist)/i.test(String(error && error.message || ''));
 }
 
 function aggregatePerformanceMetrics(items){
@@ -2505,8 +2538,8 @@ async function savePost(){
       image_url: imageUrls[0] || '',
       image_urls: imageUrls,
       media_urls: mediaUrls,
-      thumbnail_url: ''
-      ,performance_metrics: getPostMetricsFromEditor()
+      thumbnail_url: '',
+      performance_metrics: getPostMetricsFromEditor()
     };
 
     let error;
@@ -2514,6 +2547,17 @@ async function savePost(){
       ({ error } = await supabaseClient.from('posts').update(payload).eq('id', editingId));
     }else{
       ({ error } = await supabaseClient.from('posts').insert([payload]));
+    }
+    if(error && isMissingPerformanceMetricsColumn(error)){
+      const fallbackMetrics = payload.performance_metrics;
+      const compatiblePayload = { ...payload };
+      delete compatiblePayload.performance_metrics;
+      if(editingId){
+        ({ error } = await supabaseClient.from('posts').update(compatiblePayload).eq('id', editingId));
+      }else{
+        ({ error } = await supabaseClient.from('posts').insert([compatiblePayload]));
+      }
+      if(!error) saveFallbackPostMetrics({ ...compatiblePayload, id:editingId || '' }, fallbackMetrics);
     }
     if(error) throw error;
     closeModal();
