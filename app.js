@@ -20,12 +20,28 @@ const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
+const standardPostMetricNames = [
+  'Lượt xem',
+  'Số người tiếp cận',
+  'Người xem',
+  'Lượt tương tác',
+  'Lượt thích và cảm xúc',
+  'Bình luận',
+  'Lượt chia sẻ',
+  'Lượt lưu',
+  'Lượt click vào liên kết',
+  'Lượt phản hồi',
+  'Lượt theo dõi',
+  'Thời gian xem',
+  'Thời gian phát video trung bình',
+  'Lượt xem trong tối thiểu 3 giây',
+  'Thu nhập ước tính từ quảng cáo trong luồng'
+];
 const defaultPostMetrics = [
-  { name:'Lượt tiếp cận', value:0 },
-  { name:'Lượt hiển thị', value:0 },
-  { name:'Tương tác', value:0 },
-  { name:'Lượt nhấp', value:0 },
-  { name:'Lead', value:0 }
+  { name:'Lượt xem', value:0 },
+  { name:'Số người tiếp cận', value:0 },
+  { name:'Lượt tương tác', value:0 },
+  { name:'Lượt click vào liên kết', value:0 }
 ];
 const defaultGoogleMapShowrooms = [
   {
@@ -2455,20 +2471,42 @@ function renderPostMetricsEditor(metrics){
 function addPostMetricRow(name = '', value = 0){
   const target = $('postMetricsEditor');
   if(!target) return;
+  const isStandard = standardPostMetricNames.includes(name);
+  const selectedName = name || standardPostMetricNames.find(metricName => {
+    return !Array.from(document.querySelectorAll('.post-metric-select')).some(select => select.value === metricName);
+  }) || standardPostMetricNames[0];
+  const useCustom = Boolean(name) && !isStandard;
   const row = document.createElement('div');
   row.className = 'post-metric-row';
   row.innerHTML = `
-    <input class="post-metric-name" placeholder="Tên chỉ số" value="${escapeHtml(name)}">
+    <span class="metric-drag" title="Chỉ số">⋮⋮</span>
+    <div class="post-metric-name-wrap">
+      <select class="post-metric-select">
+        ${standardPostMetricNames.map(metricName => `<option value="${escapeHtml(metricName)}" ${!useCustom && selectedName === metricName ? 'selected' : ''}>${escapeHtml(metricName)}</option>`).join('')}
+        <option value="__custom__" ${useCustom ? 'selected' : ''}>+ Chỉ số tùy chỉnh</option>
+      </select>
+      <input class="post-metric-custom-name ${useCustom ? '' : 'is-hidden'}" placeholder="Nhập tên chỉ số mới" value="${useCustom ? escapeHtml(name) : ''}">
+    </div>
     <input class="post-metric-value" type="number" min="0" step="any" placeholder="Giá trị" value="${toNumber(value)}">
-    <button type="button" title="Xóa chỉ số">×</button>
+    <button type="button" class="post-metric-delete" title="Xóa chỉ số">×</button>
   `;
+  const select = row.querySelector('.post-metric-select');
+  const customInput = row.querySelector('.post-metric-custom-name');
+  select.addEventListener('change', () => {
+    const custom = select.value === '__custom__';
+    customInput.classList.toggle('is-hidden', !custom);
+    if(custom) customInput.focus();
+  });
   row.querySelector('button').addEventListener('click', () => row.remove());
   target.appendChild(row);
 }
 
 function getPostMetricsFromEditor(){
   return Array.from(document.querySelectorAll('.post-metric-row')).reduce((metrics, row) => {
-    const name = row.querySelector('.post-metric-name').value.trim();
+    const select = row.querySelector('.post-metric-select');
+    const name = select.value === '__custom__'
+      ? row.querySelector('.post-metric-custom-name').value.trim()
+      : select.value;
     const value = Math.max(0, toNumber(row.querySelector('.post-metric-value').value));
     if(name) metrics[name] = value;
     return metrics;
