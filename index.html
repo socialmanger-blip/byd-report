@@ -82,7 +82,7 @@
           <aside class="bi-filter-pane">
             <div class="filter-card">
               <label>Tháng</label>
-              <input id="monthFilter" type="month" />
+              <select id="monthFilter"></select>
             </div>
             <div class="filter-card">
               <label>Từ khóa</label>
@@ -129,6 +129,15 @@
             </section>
 
             <section class="report-grid">
+              <div class="report-panel panel-trend performance-summary-panel" data-bi-panel="overview platform showroom monthly">
+                <div class="panel-head">
+                  <div>
+                    <h4>Hiệu quả nội dung</h4>
+                    <small>Tự động cộng các chỉ số đã nhập trong từng bài đăng</small>
+                  </div>
+                </div>
+                <div id="performanceSummary" class="performance-summary"></div>
+              </div>
               <div class="report-panel panel-wide" data-bi-panel="overview monthly">
                 <div class="panel-head">
                   <h4>Total Posts by Week</h4>
@@ -324,6 +333,15 @@
 
       <label>Ghi chú / Caption</label>
       <textarea id="note" placeholder="Caption hiển thị trên kênh..."></textarea>
+
+      <div class="metric-editor-head">
+        <div>
+          <label>Chỉ số hiệu quả bài đăng</label>
+          <small class="field-hint">Nhập những số liệu đang có. Bạn có thể tự thêm chỉ số mới.</small>
+        </div>
+        <button type="button" id="btnAddPostMetric" class="ghost-btn">+ Thêm chỉ số</button>
+      </div>
+      <div id="postMetricsEditor" class="post-metrics-editor"></div>
 
       <label>Media bài đăng</label>
       <input id="imageInput" type="file" accept="image/*,video/*,.pdf" multiple />

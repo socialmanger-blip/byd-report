@@ -18,6 +18,13 @@ const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
+const defaultPostMetrics = [
+  { name:'Lượt tiếp cận', value:0 },
+  { name:'Lượt hiển thị', value:0 },
+  { name:'Tương tác', value:0 },
+  { name:'Lượt nhấp', value:0 },
+  { name:'Lead', value:0 }
+];
 const defaultGoogleMapShowrooms = [
   {
     type: 'HQ',
@@ -183,6 +190,7 @@ function bindEvents(){
   bindClick('btnCloseModal', closeModal);
   bindClick('btnCancel', closeModal);
   bindClick('btnSave', savePost);
+  bindClick('btnAddPostMetric', () => addPostMetricRow());
   bindClick('btnReload', loadPosts);
   bindClick('btnOpenExport', openExportModal);
   bindClick('btnOpenExportTop', openExportModal);
@@ -599,6 +607,46 @@ function getFilteredPosts(){
   return sortPosts(filtered, sort);
 }
 
+function normalizePerformanceMetrics(value){
+  if(!value) return {};
+  if(typeof value === 'string'){
+    try { value = JSON.parse(value); } catch(_err) { return {}; }
+  }
+  if(Array.isArray(value)){
+    return value.reduce((acc, item) => {
+      const name = String(item && item.name || '').trim();
+      if(name) acc[name] = Math.max(0, toNumber(item.value));
+      return acc;
+    }, {});
+  }
+  return Object.entries(value).reduce((acc, [name, amount]) => {
+    if(String(name).trim()) acc[String(name).trim()] = Math.max(0, toNumber(amount));
+    return acc;
+  }, {});
+}
+
+function aggregatePerformanceMetrics(items){
+  return items.reduce((totals, post) => {
+    Object.entries(normalizePerformanceMetrics(post.performance_metrics)).forEach(([name, value]) => {
+      totals[name] = (totals[name] || 0) + toNumber(value);
+    });
+    return totals;
+  }, {});
+}
+
+function formatMetricNumber(value){
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits:2 }).format(toNumber(value));
+}
+
+function renderPerformanceSummary(items){
+  const target = $('performanceSummary');
+  if(!target) return;
+  const entries = Object.entries(aggregatePerformanceMetrics(items)).sort((a,b) => b[1] - a[1]);
+  target.innerHTML = entries.length ? entries.map(([name, value]) => `
+    <div class="performance-metric-card"><b>${formatMetricNumber(value)}</b><span>${escapeHtml(name)}</span></div>
+  `).join('') : '<div class="empty-mini">Chưa có chỉ số. Mở một bài đăng và nhập KPI để dashboard tự tổng hợp.</div>';
+}
+
 function sortPosts(items, sort){
   const copy = [...items];
   if(sort === 'newest') return copy.sort((a,b)=>String(b.post_date||'').localeCompare(String(a.post_date||'')));
@@ -701,7 +749,7 @@ function renderShowroomDashboard(){
     const matchMonth = !month || getMonthKey(post.post_date) === month;
     return matchMonth && showroomMatches(post.showroom, currentShowroom);
   });
-  const dashboardChannels = currentShowroom === 'HO' ? [...showroomDashboardChannels, 'YouTube'] : showroomDashboardChannels;
+  const dashboardChannels = currentShowroom === 'HO' ? [...showroomDashboardChannels, 'YouTube', 'Website'] : showroomDashboardChannels;
   const kpis = getShowroomKpis(currentShowroom, showroomPosts);
   const modules = dashboardChannels.map(platform => {
     const isActiveChannel = currentPlatform === platform;
@@ -719,16 +767,20 @@ function renderShowroomDashboard(){
     const linkValue = platform === 'Google Maps' ? mapLink : accountLink;
     const linkLabel = platform === 'Google Maps' ? 'Link Google Maps' : 'Link account';
     const openLabel = platform === 'Google Maps' ? 'Mở map' : 'Mở account';
+    const isWebsite = platform === 'Website';
     const extraMetric = googleInfo
       ? `${renderMetricBox(toNumber(googleInfo.reviews), 'Đánh giá')}
          ${renderMetricBox(toNumber(googleInfo.target), 'Target review')}`
+      : isWebsite
+        ? `${renderMetricBox(monthlyKpi.engagement, 'Phiên truy cập')}
+           ${renderMetricBox(monthlyKpi.follow, 'Người dùng')}`
       : `${renderMetricBox(pending, 'Chờ duyệt')}
          ${renderMetricBox(idea, 'Ý tưởng')}`;
     return `
-      <article class="showroom-channel-card ${isActiveChannel ? 'is-current' : ''}">
+      <article class="showroom-channel-card ${isActiveChannel ? 'is-current' : ''} ${isWebsite ? 'website-card' : ''}">
         <div class="channel-head">
           <span class="channel-badge">${escapeHtml(platform)}</span>
-          <button type="button" class="mini-primary" data-create-platform="${escapeHtml(platform)}" data-create-showroom="${escapeHtml(currentShowroom)}">+ Tạo bài</button>
+          ${isWebsite ? '' : `<button type="button" class="mini-primary" data-create-platform="${escapeHtml(platform)}" data-create-showroom="${escapeHtml(currentShowroom)}">+ Tạo bài</button>`}
         </div>
         <div class="channel-metrics">
           ${renderMetricBox(channelPosts.length, 'Tổng bài')}
@@ -739,11 +791,12 @@ function renderShowroomDashboard(){
           <input type="url" placeholder="Dán ${escapeHtml(linkLabel.toLowerCase())}" value="${escapeHtml(linkValue)}" data-dashboard-link-platform="${escapeHtml(platform)}" data-dashboard-link-showroom="${escapeHtml(currentShowroom)}">
         </label>
         <div class="kpi-input-grid">
-          <label>Reach<input type="number" min="0" value="${monthlyKpi.reach}" data-kpi-field="reach" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>Engagement<input type="number" min="0" value="${monthlyKpi.engagement}" data-kpi-field="engagement" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>Follow<input type="number" min="0" value="${monthlyKpi.follow}" data-kpi-field="follow" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>Like<input type="number" min="0" value="${monthlyKpi.like}" data-kpi-field="like" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>${isWebsite ? 'Lượt xem trang' : 'Reach'}<input type="number" min="0" value="${monthlyKpi.reach}" data-kpi-field="reach" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>${isWebsite ? 'Phiên truy cập' : 'Engagement'}<input type="number" min="0" value="${monthlyKpi.engagement}" data-kpi-field="engagement" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>${isWebsite ? 'Người dùng' : 'Follow'}<input type="number" min="0" value="${monthlyKpi.follow}" data-kpi-field="follow" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
+          <label>${isWebsite ? 'Lead/Form' : 'Like'}<input type="number" min="0" value="${monthlyKpi.like}" data-kpi-field="like" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
         </div>
+        ${isWebsite ? '<p class="website-kpi-note">Gợi ý báo cáo: lượt xem trang, phiên truy cập, người dùng và lead/form nhận được trong tháng.</p>' : ''}
         <a class="open-link ${linkValue ? '' : 'is-disabled'}" href="${escapeHtml(linkValue || '#')}" target="_blank" rel="noopener">${openLabel}</a>
       </article>
     `;
@@ -807,7 +860,7 @@ function handleMonthlyKpiInput(event){
 
 function getShowroomKpis(showroom, showroomPosts){
   const month = $('monthFilter').value || 'all';
-  const platforms = showroom === 'HO' ? [...showroomDashboardChannels, 'YouTube'] : showroomDashboardChannels;
+  const platforms = showroom === 'HO' ? [...showroomDashboardChannels, 'YouTube', 'Website'] : showroomDashboardChannels;
   const totals = platforms.reduce((acc, platform) => {
     const kpi = getMonthlyKpi(showroom, platform, month);
     acc.reach += toNumber(kpi.reach);
@@ -2103,6 +2156,17 @@ async function uploadShowroomImage(file, showroomName){
 function setDefaultMonth(){
   const now = new Date();
   const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const postMonths = posts.map(post => getMonthKey(post.post_date)).filter(Boolean);
+  const months = new Set(postMonths);
+  for(let offset = -24; offset <= 24; offset += 1){
+    const date = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    months.add(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`);
+  }
+  const options = [...months].sort().reverse();
+  $('monthFilter').innerHTML = options.map(value => {
+    const [year, number] = value.split('-');
+    return `<option value="${value}">Tháng ${Number(number)}/${year}</option>`;
+  }).join('');
   $('monthFilter').value = month;
 }
 
@@ -2188,6 +2252,7 @@ function getChartType(targetId, fallback){
 
 function updateStats(){
   const monthPosts = getMonthPosts();
+  renderPerformanceSummary(monthPosts);
   const done = monthPosts.filter(p => p.status === 'Đã đăng').length;
   const pending = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
   const idea = monthPosts.filter(p => p.status === 'Ý tưởng').length;
@@ -2284,9 +2349,43 @@ function clearForm(){
   $('postTime').value = '';
   $('postStatus').value = 'Ý tưởng';
   $('note').value = '';
+  renderPostMetricsEditor(defaultPostMetrics);
   $('imageInput').value = '';
   $('previewWrap').innerHTML = '';
   renderPickedMedia();
+}
+
+function renderPostMetricsEditor(metrics){
+  const target = $('postMetricsEditor');
+  if(!target) return;
+  const entries = Array.isArray(metrics)
+    ? metrics
+    : Object.entries(normalizePerformanceMetrics(metrics)).map(([name, value]) => ({ name, value }));
+  target.innerHTML = '';
+  (entries.length ? entries : defaultPostMetrics).forEach(item => addPostMetricRow(item.name, item.value));
+}
+
+function addPostMetricRow(name = '', value = 0){
+  const target = $('postMetricsEditor');
+  if(!target) return;
+  const row = document.createElement('div');
+  row.className = 'post-metric-row';
+  row.innerHTML = `
+    <input class="post-metric-name" placeholder="Tên chỉ số" value="${escapeHtml(name)}">
+    <input class="post-metric-value" type="number" min="0" step="any" placeholder="Giá trị" value="${toNumber(value)}">
+    <button type="button" title="Xóa chỉ số">×</button>
+  `;
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  target.appendChild(row);
+}
+
+function getPostMetricsFromEditor(){
+  return Array.from(document.querySelectorAll('.post-metric-row')).reduce((metrics, row) => {
+    const name = row.querySelector('.post-metric-name').value.trim();
+    const value = Math.max(0, toNumber(row.querySelector('.post-metric-value').value));
+    if(name) metrics[name] = value;
+    return metrics;
+  }, {});
 }
 
 function previewImages(){
@@ -2353,6 +2452,7 @@ async function savePost(){
       image_urls: imageUrls,
       media_urls: mediaUrls,
       thumbnail_url: ''
+      ,performance_metrics: getPostMetricsFromEditor()
     };
 
     let error;
@@ -2421,6 +2521,7 @@ function editPost(id){
   $('postTime').value = p.post_time || '';
   $('postStatus').value = p.status || 'Ý tưởng';
   $('note').value = p.note || '';
+  renderPostMetricsEditor(p.performance_metrics || defaultPostMetrics);
   $('imageInput').value = '';
   renderExistingPreview(editingMediaUrls);
   renderPickedMedia();

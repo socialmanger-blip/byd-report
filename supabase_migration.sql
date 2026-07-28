@@ -7,7 +7,8 @@ add column if not exists post_time time,
 add column if not exists post_link text default '',
 add column if not exists owner text default '',
 add column if not exists hashtags text default '',
-add column if not exists content text default '';
+add column if not exists content text default '',
+add column if not exists performance_metrics jsonb default '{}'::jsonb;
 
 create index if not exists posts_post_date_idx on public.posts(post_date);
 create index if not exists posts_platform_idx on public.posts(platform);
