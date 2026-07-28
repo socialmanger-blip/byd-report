@@ -705,6 +705,79 @@ function renderPerformanceSummary(items){
   `).join('') : '<div class="empty-mini">Chưa có chỉ số. Mở một bài đăng và nhập KPI để dashboard tự tổng hợp.</div>';
 }
 
+const engagementMetricNames = new Set([
+  'Lượt tương tác',
+  'Lượt thích và cảm xúc',
+  'Bình luận',
+  'Lượt chia sẻ',
+  'Lượt lưu',
+  'Lượt click vào liên kết',
+  'Lượt phản hồi',
+  'Lượt theo dõi'
+]);
+
+function updateTopPostsMetricOptions(items){
+  const select = $('topPostsMetric');
+  if(!select) return;
+  const selected = select.value || '__engagement__';
+  const names = Object.keys(aggregatePerformanceMetrics(items)).sort((a,b) => a.localeCompare(b, 'vi'));
+  select.innerHTML = `
+    <option value="__engagement__">Tổng tương tác</option>
+    ${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}
+  `;
+  select.value = selected === '__engagement__' || names.includes(selected) ? selected : '__engagement__';
+}
+
+function getPostPerformanceValue(post, criterion){
+  const metrics = normalizePerformanceMetrics(post.performance_metrics);
+  if(criterion !== '__engagement__') return toNumber(metrics[criterion]);
+  return Object.entries(metrics).reduce((total, [name, value]) => {
+    return total + (engagementMetricNames.has(name) ? toNumber(value) : 0);
+  }, 0);
+}
+
+function renderTopPerformingPosts(items){
+  const target = $('topPerformingPosts');
+  const select = $('topPostsMetric');
+  if(!target || !select) return;
+  updateTopPostsMetricOptions(items);
+  const criterion = select.value;
+  const ranked = items
+    .map(post => ({ post, value:getPostPerformanceValue(post, criterion) }))
+    .filter(item => item.value > 0)
+    .sort((a,b) => b.value - a.value)
+    .slice(0, 5);
+  if(!ranked.length){
+    target.innerHTML = '<div class="empty-mini">Chưa có bài nào có dữ liệu cho tiêu chí này.</div>';
+    return;
+  }
+  const max = ranked[0].value || 1;
+  target.innerHTML = ranked.map((item, index) => {
+    const postMetrics = Object.entries(normalizePerformanceMetrics(item.post.performance_metrics))
+      .filter(([, value]) => toNumber(value) > 0)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 3);
+    return `
+      <article class="top-post-item">
+        <div class="top-post-rank">${index + 1}</div>
+        <div class="top-post-body">
+          <div class="top-post-title-row">
+            <div>
+              <b>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</b>
+              <span>${escapeHtml(item.post.platform || '-')} · ${formatDate(item.post.post_date)}</span>
+            </div>
+            <strong>${formatMetricNumber(item.value)}</strong>
+          </div>
+          <div class="top-post-bar"><i style="width:${Math.max(5, Math.round(item.value / max * 100))}%"></i></div>
+          <div class="top-post-metrics">
+            ${postMetrics.map(([name, value]) => `<span>${escapeHtml(name)}: <b>${formatMetricNumber(value)}</b></span>`).join('')}
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
 function sortPosts(items, sort){
   const copy = [...items];
   if(sort === 'newest') return copy.sort((a,b)=>String(b.post_date||'').localeCompare(String(a.post_date||'')));
@@ -2356,6 +2429,7 @@ function getChartType(targetId, fallback){
 function updateStats(){
   const monthPosts = getMonthPosts();
   renderPerformanceSummary(monthPosts);
+  renderTopPerformingPosts(monthPosts);
   const done = monthPosts.filter(p => p.status === 'Đã đăng').length;
   const pending = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
   const idea = monthPosts.filter(p => p.status === 'Ý tưởng').length;

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260728-3" />
+  <link rel="stylesheet" href="style.css?v=20260728-4" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -152,6 +152,18 @@
                   </div>
                 </div>
                 <div id="performanceSummary" class="performance-summary"></div>
+              </div>
+              <div class="report-panel panel-trend top-posts-panel" data-bi-panel="overview platform showroom monthly">
+                <div class="panel-head">
+                  <div>
+                    <h4>Bài đăng hiệu quả nhất</h4>
+                    <small>Top 5 bài theo chỉ số bạn chọn</small>
+                  </div>
+                  <select id="topPostsMetric" class="chart-type-select">
+                    <option value="__engagement__">Tổng tương tác</option>
+                  </select>
+                </div>
+                <div id="topPerformingPosts" class="top-performing-posts"></div>
               </div>
               <div class="report-panel panel-wide" data-bi-panel="overview monthly">
                 <div class="panel-head">
@@ -436,7 +448,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260728-3"></script>
-  <script src="app.js?v=20260728-3"></script>
+  <script src="supabase.js?v=20260728-4"></script>
+  <script src="app.js?v=20260728-4"></script>
 </body>
 </html>
