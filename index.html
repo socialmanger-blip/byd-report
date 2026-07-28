@@ -82,7 +82,22 @@
           <aside class="bi-filter-pane">
             <div class="filter-card">
               <label>Tháng</label>
-              <select id="monthFilter"></select>
+              <div class="period-picker" id="periodPicker">
+                <input id="monthFilter" type="hidden" />
+                <button type="button" class="period-picker-trigger" id="periodPickerTrigger">
+                  <span id="periodPickerLabel">Chọn tháng</span>
+                  <span aria-hidden="true">▾</span>
+                </button>
+                <div class="period-picker-popover" id="periodPickerPopover">
+                  <div class="period-picker-head">
+                    <button type="button" id="periodPrevYear" aria-label="Năm trước">‹</button>
+                    <b id="periodPickerYear">2026</b>
+                    <button type="button" id="periodNextYear" aria-label="Năm sau">›</button>
+                  </div>
+                  <div class="period-month-grid" id="periodMonthGrid"></div>
+                  <button type="button" class="period-all" id="periodAll">Tất cả thời gian</button>
+                </div>
+              </div>
             </div>
             <div class="filter-card">
               <label>Từ khóa</label>

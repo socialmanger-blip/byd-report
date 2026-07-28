@@ -7,6 +7,7 @@ let editingImageUrls = [];
 let editingMediaUrls = [];
 let appReady = false;
 let currentUser = null;
+let periodPickerDisplayYear = new Date().getFullYear();
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -224,6 +225,14 @@ function bindEvents(){
   $('yearFilter').addEventListener('change', renderPosts);
   $('sortFilter').addEventListener('change', renderPosts);
   $('monthFilter').addEventListener('change', renderPosts);
+  bindClick('periodPickerTrigger', togglePeriodPicker);
+  bindClick('periodPrevYear', () => changePeriodPickerYear(-1));
+  bindClick('periodNextYear', () => changePeriodPickerYear(1));
+  bindClick('periodAll', () => selectReportMonth(''));
+  document.addEventListener('click', event => {
+    const picker = $('periodPicker');
+    if(picker && !picker.contains(event.target)) closePeriodPicker();
+  });
   $('btnCloseImage').addEventListener('click', closeImage);
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
@@ -2156,18 +2165,63 @@ async function uploadShowroomImage(file, showroomName){
 function setDefaultMonth(){
   const now = new Date();
   const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const postMonths = posts.map(post => getMonthKey(post.post_date)).filter(Boolean);
-  const months = new Set(postMonths);
-  for(let offset = -24; offset <= 24; offset += 1){
-    const date = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    months.add(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`);
-  }
-  const options = [...months].sort().reverse();
-  $('monthFilter').innerHTML = options.map(value => {
-    const [year, number] = value.split('-');
-    return `<option value="${value}">Tháng ${Number(number)}/${year}</option>`;
-  }).join('');
   $('monthFilter').value = month;
+  periodPickerDisplayYear = now.getFullYear();
+  renderPeriodPicker();
+}
+
+function togglePeriodPicker(){
+  const popover = $('periodPickerPopover');
+  if(!popover) return;
+  const willOpen = !popover.classList.contains('is-open');
+  closePeriodPicker();
+  if(willOpen){
+    const selected = $('monthFilter').value;
+    if(selected) periodPickerDisplayYear = Number(selected.slice(0,4));
+    renderPeriodPicker();
+    popover.classList.add('is-open');
+    $('periodPickerTrigger').classList.add('is-open');
+  }
+}
+
+function closePeriodPicker(){
+  if($('periodPickerPopover')) $('periodPickerPopover').classList.remove('is-open');
+  if($('periodPickerTrigger')) $('periodPickerTrigger').classList.remove('is-open');
+}
+
+function changePeriodPickerYear(offset){
+  periodPickerDisplayYear += offset;
+  renderPeriodPicker();
+}
+
+function renderPeriodPicker(){
+  const selected = $('monthFilter').value;
+  const label = $('periodPickerLabel');
+  if(label){
+    label.innerText = selected
+      ? `Tháng ${Number(selected.slice(5,7))}/${selected.slice(0,4)}`
+      : 'Tất cả thời gian';
+  }
+  if($('periodPickerYear')) $('periodPickerYear').innerText = periodPickerDisplayYear;
+  const grid = $('periodMonthGrid');
+  if(!grid) return;
+  grid.innerHTML = Array.from({ length:12 }, (_, index) => {
+    const month = String(index + 1).padStart(2, '0');
+    const value = `${periodPickerDisplayYear}-${month}`;
+    return `<button type="button" class="${selected === value ? 'is-selected' : ''}" data-report-month="${value}">Thg ${index + 1}</button>`;
+  }).join('');
+  grid.querySelectorAll('[data-report-month]').forEach(button => {
+    button.addEventListener('click', () => selectReportMonth(button.dataset.reportMonth));
+  });
+  if($('periodAll')) $('periodAll').classList.toggle('is-selected', !selected);
+}
+
+function selectReportMonth(value){
+  $('monthFilter').value = value;
+  if(value) periodPickerDisplayYear = Number(value.slice(0,4));
+  renderPeriodPicker();
+  closePeriodPicker();
+  $('monthFilter').dispatchEvent(new Event('change', { bubbles:true }));
 }
 
 function getMonthKey(dateText){

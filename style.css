@@ -3967,6 +3967,96 @@ tbody tr:hover {
   color: #cbd5e1 !important;
 }
 
+/* Meta-style month picker */
+.period-picker { position: relative; }
+.period-picker-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 11px;
+  border: 1px solid rgba(96, 165, 250, .3);
+  border-radius: 8px;
+  background: rgba(4, 12, 24, .78);
+  color: #f8fcff;
+  cursor: pointer;
+  font-weight: 800;
+}
+.period-picker-trigger.is-open {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, .12);
+}
+.period-picker-popover {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 8px);
+  left: 0;
+  display: none;
+  width: 286px;
+  padding: 14px;
+  border: 1px solid rgba(96, 165, 250, .35);
+  border-radius: 14px;
+  background: #0b1728;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .55);
+}
+.period-picker-popover.is-open { display: block; }
+.period-picker-head {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.period-picker-head button,
+.period-month-grid button,
+.period-all {
+  min-height: 38px;
+  border: 1px solid rgba(96, 165, 250, .2);
+  border-radius: 9px;
+  background: rgba(15, 31, 55, .86);
+  color: #eaf6ff;
+  cursor: pointer;
+  font-weight: 800;
+}
+.period-picker-head button { font-size: 22px; }
+.period-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.period-month-grid button:hover,
+.period-all:hover { border-color: #22d3ee; background: rgba(34, 211, 238, .12); }
+.period-month-grid button.is-selected,
+.period-all.is-selected {
+  border-color: #22d3ee;
+  background: linear-gradient(135deg, #0891b2, #2563eb);
+  color: #fff;
+}
+.period-all { width: 100%; margin-top: 10px; }
+
+/* Export modal contrast fix */
+.export-box .export-fields {
+  border-color: rgba(96, 165, 250, .22);
+  background: rgba(4, 12, 24, .58);
+}
+.export-box .export-field {
+  border-color: rgba(96, 165, 250, .22);
+  background: rgba(15, 31, 55, .9);
+  color: #f1f7ff;
+}
+.export-box .export-field label,
+.export-box .export-field span {
+  color: #f1f7ff !important;
+}
+.export-box .field-actions button {
+  border-color: rgba(96, 165, 250, .28);
+  background: #132844;
+  color: #eaf6ff;
+}
+.export-box input[type="checkbox"] { accent-color: #22d3ee; }
+
 /* Flexible performance metrics */
 .performance-summary-panel { grid-column: 1 / -1; }
 .performance-summary {
