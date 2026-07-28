@@ -9,6 +9,7 @@ let appReady = false;
 let currentUser = null;
 let periodPickerDisplayYear = new Date().getFullYear();
 let cloudPostMetricsFallback = {};
+let metaImportRows = [];
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -213,6 +214,11 @@ function bindEvents(){
   bindClick('btnReload', loadPosts);
   bindClick('btnOpenExport', openExportModal);
   bindClick('btnOpenExportTop', openExportModal);
+  bindClick('btnOpenMetaImport', openMetaImportModal);
+  bindClick('btnCloseMetaImport', closeMetaImportModal);
+  bindClick('btnCancelMetaImport', closeMetaImportModal);
+  bindClick('btnRunMetaImport', importMetaRows);
+  $('metaCsvInput').addEventListener('change', handleMetaCsvFile);
   bindClick('btnCloseExport', closeExportModal);
   bindClick('btnCancelExport', closeExportModal);
   bindClick('btnExportExcel', exportExcel);
@@ -255,6 +261,7 @@ function bindEvents(){
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
+  $('metaImportModal').addEventListener('click', (e)=>{ if(e.target.id==='metaImportModal') closeMetaImportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('moveMediaModal').addEventListener('click', (e)=>{ if(e.target.id==='moveMediaModal') closeMoveMediaModal(); });
   $('imageInput').addEventListener('change', previewImages);
@@ -2872,6 +2879,196 @@ function formatDate(d){ if(!d) return '-'; const [y,m,day]=d.split('-'); return 
 function escapeHtml(text){ return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function escapeJs(text){ return String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
+
+function openMetaImportModal(){
+  metaImportRows = [];
+  $('metaCsvInput').value = '';
+  $('metaImportSummary').innerHTML = '<div class="empty-mini">Chưa chọn file CSV.</div>';
+  $('metaImportPreview').innerHTML = '';
+  $('btnRunMetaImport').disabled = true;
+  $('metaImportModal').classList.add('open');
+}
+
+function closeMetaImportModal(){ $('metaImportModal').classList.remove('open'); }
+
+function parseCsvText(text){
+  const rows = [];
+  let row = [], value = '', quoted = false;
+  const source = String(text || '').replace(/^\uFEFF/, '');
+  for(let i = 0; i < source.length; i += 1){
+    const char = source[i];
+    if(char === '"'){
+      if(quoted && source[i + 1] === '"'){ value += '"'; i += 1; }
+      else quoted = !quoted;
+    }else if(char === ',' && !quoted){
+      row.push(value); value = '';
+    }else if((char === '\n' || char === '\r') && !quoted){
+      if(char === '\r' && source[i + 1] === '\n') i += 1;
+      row.push(value); value = '';
+      if(row.some(cell => cell !== '')) rows.push(row);
+      row = [];
+    }else value += char;
+  }
+  if(value || row.length){ row.push(value); rows.push(row); }
+  if(rows.length < 2) return [];
+  const headers = rows[0].map(header => header.trim());
+  return rows.slice(1).map(cells => headers.reduce((record, header, index) => {
+    record[header] = cells[index] || '';
+    return record;
+  }, {}));
+}
+
+function metaNumber(value){
+  const number = Number(String(value || '').replace(/\s/g, '').replace(/,/g, ''));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseMetaPostDate(value){
+  const match = String(value || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(!match) return '';
+  return `${match[3]}-${String(match[1]).padStart(2,'0')}-${String(match[2]).padStart(2,'0')}`;
+}
+
+function metaTitle(value){
+  return String(value || '').split(/\r?\n/).map(line => line.trim()).find(Boolean) || 'Bài đăng từ Meta';
+}
+
+function inferMetaShowroom(row){
+  const text = normalizeText(`${row['Tên Trang'] || ''} ${row['Tiêu đề'] || ''}`);
+  return showroomNames.find(name => name !== 'HO' && text.includes(normalizeText(name))) || 'HO';
+}
+
+function metaMetrics(row){
+  const metrics = {
+    'Lượt xem':metaNumber(row['Lượt xem']),
+    'Số người tiếp cận':metaNumber(row['Số người tiếp cận']),
+    'Lượt tương tác':metaNumber(row['Cảm xúc, bình luận và lượt chia sẻ']),
+    'Lượt thích và cảm xúc':metaNumber(row['Cảm xúc']),
+    'Bình luận':metaNumber(row['Bình luận']),
+    'Lượt chia sẻ':metaNumber(row['Lượt chia sẻ']),
+    'Tổng lượt click':metaNumber(row['Tổng lượt click']),
+    'Lượt click vào liên kết':metaNumber(row['Lượt click vào liên kết']),
+    'Thời gian xem':metaNumber(row['Số Giây xem']),
+    'Thời gian phát video trung bình':metaNumber(row['Số Giây xem trung bình']),
+    'Thu nhập ước tính từ quảng cáo trong luồng':metaNumber(row['Thu nhập ước tính ((USD))']),
+    'Lượt hiển thị quảng cáo':metaNumber(row['Lượt hiển thị quảng cáo'])
+  };
+  return Object.fromEntries(Object.entries(metrics).filter(([, amount]) => amount !== 0));
+}
+
+function titleSimilarity(left, right){
+  const a = new Set(normalizeText(left).split(/\s+/).filter(word => word.length > 2));
+  const b = new Set(normalizeText(right).split(/\s+/).filter(word => word.length > 2));
+  if(!a.size || !b.size) return 0;
+  return [...a].filter(word => b.has(word)).length / Math.min(a.size, b.size);
+}
+
+function findMetaPostMatch(row){
+  const date = parseMetaPostDate(row['Thời gian đăng']);
+  const title = metaTitle(row['Tiêu đề']);
+  const metaId = String(row['ID bài viết'] || '');
+  const ranked = posts.map(post => {
+    let score = 0;
+    if(metaId && String(post.post_link || '').includes(metaId)) score += 100;
+    if(date && post.post_date === date) score += 35;
+    score += titleSimilarity(title, post.title || post.note || '') * 65;
+    return { post, score };
+  }).sort((a,b) => b.score - a.score);
+  return ranked[0] && ranked[0].score >= 45 ? ranked[0].post : null;
+}
+
+async function handleMetaCsvFile(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  try{
+    const parsed = parseCsvText(await file.text());
+    if(!parsed.length || !Object.prototype.hasOwnProperty.call(parsed[0], 'ID bài viết')){
+      throw new Error('File không đúng định dạng báo cáo nội dung của Meta.');
+    }
+    metaImportRows = parsed.map(row => ({
+      source:row,
+      title:metaTitle(row['Tiêu đề']),
+      postDate:parseMetaPostDate(row['Thời gian đăng']),
+      showroom:inferMetaShowroom(row),
+      metrics:metaMetrics(row),
+      match:findMetaPostMatch(row)
+    }));
+    renderMetaImportPreview();
+    $('btnRunMetaImport').disabled = false;
+  }catch(err){
+    metaImportRows = [];
+    $('btnRunMetaImport').disabled = true;
+    $('metaImportSummary').innerHTML = `<div class="meta-import-error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderMetaImportPreview(){
+  const matched = metaImportRows.filter(item => item.match).length;
+  $('metaImportSummary').innerHTML = `
+    <div><b>${metaImportRows.length}</b><span>Dòng dữ liệu</span></div>
+    <div><b>${matched}</b><span>Cập nhật bài có sẵn</span></div>
+    <div><b>${metaImportRows.length - matched}</b><span>Bài chưa khớp</span></div>
+  `;
+  $('metaImportPreview').innerHTML = metaImportRows.map((item, index) => `
+    <div class="meta-preview-row">
+      <span>${index + 1}</span>
+      <div><b>${escapeHtml(item.title)}</b><small>${formatDate(item.postDate)} · ${escapeHtml(item.showroom)}</small></div>
+      <em class="${item.match ? 'is-match' : 'is-new'}">${item.match ? 'Cập nhật' : 'Tạo mới'}</em>
+    </div>
+  `).join('');
+}
+
+async function saveImportedMetaItem(item, createMissing){
+  const metaId = String(item.source['ID bài viết'] || '');
+  const permalink = item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : '');
+  if(item.match){
+    let { error } = await supabaseClient.from('posts').update({ performance_metrics:item.metrics, post_link:permalink }).eq('id', item.match.id);
+    if(error && isMissingPerformanceMetricsColumn(error)){
+      ({ error } = await supabaseClient.from('posts').update({ post_link:permalink }).eq('id', item.match.id));
+    }
+    if(error) throw error;
+    await saveFallbackPostMetrics({ ...item.match, post_link:permalink }, item.metrics);
+    return 'updated';
+  }
+  if(!createMissing) return 'skipped';
+  const payload = {
+    platform:'Facebook', showroom:item.showroom, title:item.title, post_date:item.postDate || null,
+    status:'Đã đăng', note:item.source['Tiêu đề'] || '', post_link:permalink,
+    image_url:'', image_urls:[], media_urls:[], thumbnail_url:'', performance_metrics:item.metrics
+  };
+  let { error } = await supabaseClient.from('posts').insert([payload]);
+  if(error && isMissingPerformanceMetricsColumn(error)){
+    const compatiblePayload = { ...payload };
+    delete compatiblePayload.performance_metrics;
+    ({ error } = await supabaseClient.from('posts').insert([compatiblePayload]));
+  }
+  if(error) throw error;
+  await saveFallbackPostMetrics(payload, item.metrics);
+  return 'created';
+}
+
+async function importMetaRows(){
+  if(!metaImportRows.length) return;
+  const button = $('btnRunMetaImport');
+  button.disabled = true;
+  button.innerText = 'Đang nhập...';
+  const totals = { updated:0, created:0, skipped:0 };
+  try{
+    for(const item of metaImportRows){
+      const result = await saveImportedMetaItem(item, $('metaCreateMissing').checked);
+      totals[result] += 1;
+    }
+    closeMetaImportModal();
+    await loadPosts();
+    alert(`Đã nhập Meta thành công: ${totals.updated} bài cập nhật, ${totals.created} bài tạo mới, ${totals.skipped} bài bỏ qua.`);
+  }catch(err){
+    console.error(err);
+    alert('Lỗi nhập dữ liệu Meta: ' + err.message);
+  }finally{
+    button.disabled = false;
+    button.innerText = 'Nhập dữ liệu';
+  }
+}
 
 function openExportModal(){
   renderExportFields();

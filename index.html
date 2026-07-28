@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260728-6" />
+  <link rel="stylesheet" href="style.css?v=20260728-7" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -58,6 +58,7 @@
           <div id="connectionStatus" class="status-ok">Đang kết nối Supabase...</div>
         </div>
         <div class="top-actions post-content">
+          <button id="btnOpenMetaImport" type="button">Nhập CSV Meta</button>
           <button id="btnOpenExportTop">Xuất Excel</button>
           <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
         </div>
@@ -420,6 +421,31 @@
     </div>
   </div>
 
+  <div class="modal" id="metaImportModal">
+    <div class="modal-box export-box meta-import-box">
+      <div class="modal-head">
+        <div>
+          <h3>Nhập báo cáo từ Meta</h3>
+          <small>Hỗ trợ file CSV xuất từ Meta Business Suite</small>
+        </div>
+        <button class="icon" id="btnCloseMetaImport">×</button>
+      </div>
+      <label>Chọn file CSV Meta</label>
+      <input id="metaCsvInput" type="file" accept=".csv,text/csv" />
+      <div class="meta-import-options">
+        <label><input id="metaCreateMissing" type="checkbox" checked> Tự tạo bài đăng nếu chưa có trên hệ thống</label>
+      </div>
+      <div id="metaImportSummary" class="meta-import-summary">
+        <div class="empty-mini">Chưa chọn file CSV.</div>
+      </div>
+      <div id="metaImportPreview" class="meta-import-preview"></div>
+      <div class="modal-actions">
+        <button id="btnCancelMetaImport" type="button">Hủy</button>
+        <button class="primary" id="btnRunMetaImport" type="button" disabled>Nhập dữ liệu</button>
+      </div>
+    </div>
+  </div>
+
   <div class="image-modal" id="imageModal">
     <button class="close-img" id="btnCloseImage">×</button>
     <img id="bigImage" />
@@ -457,7 +483,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260728-6"></script>
-  <script src="app.js?v=20260728-6"></script>
+  <script src="supabase.js?v=20260728-7"></script>
+  <script src="app.js?v=20260728-7"></script>
 </body>
 </html>
