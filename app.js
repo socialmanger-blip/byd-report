@@ -10,6 +10,7 @@ let currentUser = null;
 let periodPickerDisplayYear = new Date().getFullYear();
 let cloudPostMetricsFallback = {};
 let metaImportRows = [];
+let metaImportContext = { platform:'Facebook', showroom:null };
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -2881,11 +2882,24 @@ function escapeJs(text){ return String(text).replace(/\\/g, '\\\\').replace(/'/g
 
 
 function openMetaImportModal(){
+  if(currentPlatform === 'all' && currentShowroom === 'all'){
+    alert('Vui lòng chọn một tab showroom hoặc nền tảng trước khi nhập CSV Meta.');
+    return;
+  }
+  metaImportContext = {
+    platform:currentPlatform !== 'all' ? currentPlatform : 'Facebook',
+    showroom:currentShowroom !== 'all' ? currentShowroom : null
+  };
   metaImportRows = [];
   $('metaCsvInput').value = '';
   $('metaImportSummary').innerHTML = '<div class="empty-mini">Chưa chọn file CSV.</div>';
   $('metaImportPreview').innerHTML = '';
   $('btnRunMetaImport').disabled = true;
+  $('metaImportDestination').innerHTML = `
+    <b>Phạm vi nhập:</b>
+    ${metaImportContext.showroom ? escapeHtml(showroomDisplayName(metaImportContext.showroom)) : 'Tất cả showroom'}
+    · ${escapeHtml(metaImportContext.platform)}
+  `;
   $('metaImportModal').classList.add('open');
 }
 
@@ -2934,6 +2948,7 @@ function metaTitle(value){
 }
 
 function inferMetaShowroom(row){
+  if(metaImportContext.showroom) return metaImportContext.showroom;
   const text = normalizeText(`${row['Tên Trang'] || ''} ${row['Tiêu đề'] || ''}`);
   return showroomNames.find(name => name !== 'HO' && text.includes(normalizeText(name))) || 'HO';
 }
@@ -2967,7 +2982,11 @@ function findMetaPostMatch(row){
   const date = parseMetaPostDate(row['Thời gian đăng']);
   const title = metaTitle(row['Tiêu đề']);
   const metaId = String(row['ID bài viết'] || '');
-  const ranked = posts.map(post => {
+  const ranked = posts.filter(post => {
+    const matchPlatform = platformMatches(post.platform, metaImportContext.platform);
+    const matchShowroom = !metaImportContext.showroom || showroomMatches(post.showroom, metaImportContext.showroom);
+    return matchPlatform && matchShowroom;
+  }).map(post => {
     let score = 0;
     if(metaId && String(post.post_link || '').includes(metaId)) score += 100;
     if(date && post.post_date === date) score += 35;
@@ -3032,7 +3051,7 @@ async function saveImportedMetaItem(item, createMissing){
   }
   if(!createMissing) return 'skipped';
   const payload = {
-    platform:'Facebook', showroom:item.showroom, title:item.title, post_date:item.postDate || null,
+    platform:metaImportContext.platform, showroom:metaImportContext.showroom || item.showroom, title:item.title, post_date:item.postDate || null,
     status:'Đã đăng', note:item.source['Tiêu đề'] || '', post_link:permalink,
     image_url:'', image_urls:[], media_urls:[], thumbnail_url:'', performance_metrics:item.metrics
   };
