@@ -4161,6 +4161,14 @@ tbody tr:hover {
   white-space: nowrap;
 }
 .meta-preview-row small { color: #94a3b8; }
+.meta-preview-row .meta-match-detail {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: #6ee7b7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .meta-preview-row em {
   padding: 5px 8px;
   border-radius: 999px;

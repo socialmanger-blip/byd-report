@@ -2982,18 +2982,23 @@ function findMetaPostMatch(row){
   const date = parseMetaPostDate(row['Thời gian đăng']);
   const title = metaTitle(row['Tiêu đề']);
   const metaId = String(row['ID bài viết'] || '');
-  const ranked = posts.filter(post => {
+  const candidates = posts.filter(post => {
     const matchPlatform = platformMatches(post.platform, metaImportContext.platform);
     const matchShowroom = !metaImportContext.showroom || showroomMatches(post.showroom, metaImportContext.showroom);
     return matchPlatform && matchShowroom;
-  }).map(post => {
-    let score = 0;
-    if(metaId && String(post.post_link || '').includes(metaId)) score += 100;
-    if(date && post.post_date === date) score += 35;
-    score += titleSimilarity(title, post.title || post.note || '') * 65;
-    return { post, score };
-  }).sort((a,b) => b.score - a.score);
-  return ranked[0] && ranked[0].score >= 45 ? ranked[0].post : null;
+  });
+  const idMatch = candidates.find(post => metaId && String(post.post_link || '').includes(metaId));
+  if(idMatch) return idMatch;
+  const ranked = candidates.map(post => ({
+    post,
+    sameDate:Boolean(date && post.post_date === date),
+    similarity:titleSimilarity(title, post.title || post.note || '')
+  })).sort((a,b) => b.similarity - a.similarity);
+  const best = ranked[0];
+  if(!best) return null;
+  if(best.sameDate && best.similarity >= 0.55) return best.post;
+  if(best.similarity >= 0.9) return best.post;
+  return null;
 }
 
 async function handleMetaCsvFile(event){
@@ -3031,7 +3036,11 @@ function renderMetaImportPreview(){
   $('metaImportPreview').innerHTML = metaImportRows.map((item, index) => `
     <div class="meta-preview-row">
       <span>${index + 1}</span>
-      <div><b>${escapeHtml(item.title)}</b><small>${formatDate(item.postDate)} · ${escapeHtml(item.showroom)}</small></div>
+      <div>
+        <b>${escapeHtml(item.title)}</b>
+        <small>${formatDate(item.postDate)} · ${escapeHtml(item.showroom)}</small>
+        ${item.match ? `<small class="meta-match-detail">Khớp với: ${escapeHtml(item.match.title || 'Bài không tiêu đề')}</small>` : ''}
+      </div>
       <em class="${item.match ? 'is-match' : 'is-new'}">${item.match ? 'Cập nhật' : 'Tạo mới'}</em>
     </div>
   `).join('');
