@@ -221,6 +221,7 @@ function bindEvents(){
   bindClick('btnReload', loadPosts);
   bindClick('btnOpenExport', openExportModal);
   bindClick('btnOpenExportTop', openExportModal);
+  bindClick('btnExportPdf', exportPdfReport);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -252,6 +253,12 @@ function bindEvents(){
     select.addEventListener('change', updateStats);
   });
   $('searchInput').addEventListener('input', renderPosts);
+  if($('postSearchInput')){
+    $('postSearchInput').addEventListener('input', event => {
+      $('searchInput').value = event.target.value;
+      renderPosts();
+    });
+  }
   $('statusFilter').addEventListener('change', renderPosts);
   $('yearFilter').addEventListener('change', renderPosts);
   $('sortFilter').addEventListener('change', renderPosts);
@@ -632,6 +639,10 @@ function showroomMatches(value, showroom){
   return showroomList(value).includes(normalizeShowroomKey(showroom));
 }
 
+function belongsToReportShowrooms(post){
+  return showroomList(post && post.showroom).some(showroom => reportShowroomNames.includes(showroom));
+}
+
 function showroomDisplayName(showroom){
   return normalizeShowroomKey(showroom) === 'HO' ? 'BYD NEG Việt Nam' : `BYD NEG ${showroom}`;
 }
@@ -662,16 +673,20 @@ function renderImages(post){
 
 function getFilteredPosts(){
   const keyword = $('searchInput').value.toLowerCase().trim();
+  const month = $('monthFilter').value;
   const status = $('statusFilter').value;
   const year = $('yearFilter').value;
   const sort = $('sortFilter').value;
   const filtered = posts.filter(p => {
     const matchPlatform = platformMatches(p.platform, currentPlatform);
     const matchStatus = status === 'all' || p.status === status;
-    const matchShowroom = showroomMatches(p.showroom, currentShowroom);
+    const matchShowroom = currentShowroom === 'all'
+      ? belongsToReportShowrooms(p)
+      : showroomMatches(p.showroom, currentShowroom);
+    const matchMonth = !month || getMonthKey(p.post_date) === month;
     const matchYear = year === 'all' || String(p.post_date || '').slice(0,4) === year;
     const text = `${p.title||''} ${p.note||''} ${p.showroom||''} ${p.platform||''}`.toLowerCase();
-    return matchPlatform && matchStatus && matchShowroom && matchYear && text.includes(keyword);
+    return matchPlatform && matchStatus && matchShowroom && matchMonth && matchYear && text.includes(keyword);
   });
   return sortPosts(filtered, sort);
 }
@@ -900,32 +915,48 @@ function renderPlatformPerformanceDashboard(){
   const target = $('platformPerformanceDashboard');
   if(!target) return;
   const selectedMonth = $('monthFilter').value;
-  const scoped = posts.filter(post => !selectedMonth || getMonthKey(post.post_date) === selectedMonth);
+  const scoped = posts.filter(post => belongsToReportShowrooms(post) && (!selectedMonth || getMonthKey(post.post_date) === selectedMonth));
   const definitions = [
     { name:'Facebook', posts:scoped.filter(p => platformMatches(p.platform, 'Facebook')) },
     { name:'TikTok', posts:scoped.filter(p => platformMatches(p.platform, 'TikTok')) },
     { name:'Website', posts:scoped.filter(p => platformMatches(p.platform, 'Website')) }
   ];
   const rows = definitions.map(item => {
-    const reach = sumPostAliases(item.posts, ['Số người tiếp cận', 'Reach']);
-    const engagement = totalEngagementForPosts(item.posts);
-    return { ...item, reach, engagement };
+    const monthly = reportShowroomNames.reduce((acc, showroom) => {
+      const kpi = getMonthlyKpi(showroom, item.name, selectedMonth || 'all');
+      acc.reach += toNumber(kpi.reach);
+      acc.engagement += toNumber(kpi.engagement);
+      acc.follow += toNumber(kpi.follow);
+      acc.like += toNumber(kpi.like);
+      return acc;
+    }, { reach:0, engagement:0, follow:0, like:0 });
+    const postReach = sumPostAliases(item.posts, ['Số người tiếp cận', 'Reach']);
+    const postEngagement = totalEngagementForPosts(item.posts);
+    const postFollow = sumPostAliases(item.posts, ['Lượt theo dõi','Followers tăng','Người theo dõi mới']);
+    return {
+      ...item,
+      reach:postReach || monthly.reach,
+      engagement:postEngagement || monthly.engagement,
+      follow:postFollow || monthly.follow,
+      like:sumPostAliases(item.posts, ['Lượt thích và cảm xúc','Like']) || monthly.like
+    };
   });
   const selectedPlatform = currentPlatform;
   const visibleDefinitions = selectedPlatform === 'all'
     ? definitions
     : definitions.filter(item => item.name === selectedPlatform);
   const cards = visibleDefinitions.map(item => {
+    const summary = rows.find(row => row.name === item.name) || item;
     const top = [...item.posts].sort((a,b) => getPostPerformanceValue(b, item.name === 'TikTok' ? 'Lượt xem' : '__engagement__') - getPostPerformanceValue(a, item.name === 'TikTok' ? 'Lượt xem' : '__engagement__'))[0];
     const metrics = item.name === 'Facebook' ? [
-      ['Reach', platformDashboardMetric(item.posts, ['Số người tiếp cận','Reach'])],
-      ['Engagement', formatMetricNumber(totalEngagementForPosts(item.posts))],
-      ['Followers tăng', platformDashboardMetric(item.posts, ['Lượt theo dõi','Followers tăng','Người theo dõi mới'])],
+      ['Reach', formatMetricNumber(summary.reach)],
+      ['Engagement', formatMetricNumber(summary.engagement)],
+      ['Followers tăng', formatMetricNumber(summary.follow)],
       ['Số bài', formatMetricNumber(item.posts.length)]
     ] : item.name === 'TikTok' ? [
       ['View', platformDashboardMetric(item.posts, ['Lượt xem','Views'])],
-      ['Reach', platformDashboardMetric(item.posts, ['Số người tiếp cận','Reach'])],
-      ['Followers', platformDashboardMetric(item.posts, ['Lượt theo dõi','Followers tăng','Người theo dõi mới'])],
+      ['Reach', formatMetricNumber(summary.reach)],
+      ['Followers', formatMetricNumber(summary.follow)],
       ['Số video', formatMetricNumber(item.posts.length)]
     ] : [
       ['Visitor', platformDashboardMetric(item.posts, ['Visitor','Người dùng','Lượt xem trang'])],
@@ -949,28 +980,101 @@ function renderPlatformPerformanceDashboard(){
     </div>`;
 }
 
+function getShowroomCommunicationTotals(showroom, month){
+  const items = posts.filter(post => {
+    const matchMonth = !month || getMonthKey(post.post_date) === month;
+    return matchMonth && showroomMatches(post.showroom, showroom);
+  });
+  const platforms = showroom === 'HO'
+    ? [...showroomDashboardChannels, 'YouTube', 'Website']
+    : showroomDashboardChannels;
+  const monthly = platforms.reduce((acc, platform) => {
+    const kpi = getMonthlyKpi(showroom, platform, month || 'all');
+    acc.reach += toNumber(kpi.reach);
+    acc.engagement += toNumber(kpi.engagement);
+    acc.follow += toNumber(kpi.follow);
+    acc.like += toNumber(kpi.like);
+    return acc;
+  }, { reach:0, engagement:0, follow:0, like:0 });
+  const postReach = sumPostAliases(items, ['Số người tiếp cận','Reach']);
+  const postEngagement = totalEngagementForPosts(items);
+  const postFollow = sumPostAliases(items, ['Lượt theo dõi','Followers tăng','Người theo dõi mới']);
+  const postLike = sumPostAliases(items, ['Lượt thích và cảm xúc','Like']);
+  const reach = postReach || monthly.reach;
+  const engagement = postEngagement || monthly.engagement;
+  const topPost = items
+    .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
+    .sort((a,b) => b.value - a.value)[0];
+  return {
+    showroom,
+    items,
+    posts:items.length,
+    reach,
+    engagement,
+    engagementRate:reach ? engagement / reach * 100 : 0,
+    follow:postFollow || monthly.follow,
+    like:postLike || monthly.like,
+    views:sumPostAliases(items, ['Lượt xem','Views']),
+    topPost:topPost ? topPost.post : null
+  };
+}
+
 function renderShowroomAnalysisDashboard(){
   const target = $('showroomAnalysisDashboard');
   if(!target) return;
-  const items = getMonthPosts();
-  const value = aliases => sumPostAliases(items, aliases);
-  const reach = value(['Số người tiếp cận','Reach']);
-  const lead = value(['Lead','Lead/Form','Khách hàng tiềm năng']);
-  const groups = [
-    ['Sales', [['Lead',lead],['Khách đến showroom',value(['Showroom Visit','Khách đến showroom'])],['Test Drive',value(['Test Drive','Lái thử'])],['Báo giá',value(['Báo giá','Quotation'])],['Đặt cọc',value(['Đặt cọc','Deposit'])],['Bàn giao',value(['Bàn giao','Delivery','Giao xe'])]]],
-    ['Marketing', [['Reach',reach],['Engagement',totalEngagementForPosts(items)],['Chi phí Ads',value(['Chi phí Ads','Marketing Cost','Ads Cost'])],['CPL',lead ? value(['Chi phí Ads','Marketing Cost','Ads Cost']) / lead : 0]]],
-    ['Service', [['Xe vào xưởng',value(['Xe vào xưởng','Service Visit'])],['Doanh thu',value(['Doanh thu Service','Service Revenue'])],['CSI',value(['CSI'])]]],
-    ['Inventory', [['Xe tồn',value(['Xe tồn','Inventory'])],['Xe giao',value(['Xe giao','Delivery','Giao xe'])],['Xe nhập',value(['Xe nhập','Inbound'])]]]
-  ];
-  const funnel = [
-    ['Reach',reach],['Lead',lead],['Showroom Visit',value(['Showroom Visit','Khách đến showroom'])],
-    ['Test Drive',value(['Test Drive','Lái thử'])],['Deposit',value(['Đặt cọc','Deposit'])],['Delivery',value(['Bàn giao','Delivery','Giao xe'])]
-  ];
+  const panel = target.closest('[data-bi-panel]');
+  const shouldShow = currentShowroom === 'all' && currentBiView === 'showroom';
+  if(panel) panel.classList.toggle('is-hidden', !shouldShow);
+  if(!shouldShow){
+    target.innerHTML = '';
+    return;
+  }
+  const month = $('monthFilter').value;
+  const branchNames = ['Phú Quốc','Cần Thơ','An Giang','Kiên Giang','Tiền Giang'];
+  const rows = branchNames.map(showroom => getShowroomCommunicationTotals(showroom, month));
+  const allUnits = reportShowroomNames.map(showroom => getShowroomCommunicationTotals(showroom, month));
+  const total = allUnits.reduce((acc, row) => {
+    acc.posts += row.posts;
+    acc.reach += row.reach;
+    acc.engagement += row.engagement;
+    acc.follow += row.follow;
+    acc.like += row.like;
+    acc.views += row.views;
+    return acc;
+  }, { posts:0, reach:0, engagement:0, follow:0, like:0, views:0 });
+  const best = [...rows].sort((a,b) => b.reach - a.reach)[0];
   target.innerHTML = `
-    <div class="dedicated-title"><div><h3>Showroom Analysis</h3><p>Tổng hợp hiệu quả vận hành ${currentShowroom === 'all' ? 'toàn hệ thống' : showroomDisplayName(currentShowroom)}</p></div></div>
-    <div class="operation-groups">${groups.map(([name,metrics]) => `<section class="operation-card"><h4>${name}</h4><div>${metrics.map(([label,number]) => `<span>${label}<b>${formatMetricNumber(number)}</b></span>`).join('')}</div></section>`).join('')}</div>
-    <section class="operation-card staff-card"><h4>Nhân sự</h4><div class="staff-table"><span><b>TVBH</b><b>Lead</b><b>Cọc</b><b>Giao xe</b></span><span><em>Toàn bộ TVBH</em><b>${formatMetricNumber(lead)}</b><b>${formatMetricNumber(value(['Đặt cọc','Deposit']))}</b><b>${formatMetricNumber(value(['Bàn giao','Delivery','Giao xe']))}</b></span></div></section>
-    <section class="funnel-card"><h4>Funnel vận hành</h4><div class="operation-funnel">${funnel.map(([label,number],index) => `<div style="--funnel-width:${100-index*12}%"><span>${label}</span><b>${formatMetricNumber(number)}</b></div>${index < funnel.length-1 ? '<i>↓</i>' : ''}`).join('')}</div></section>`;
+    <div class="dedicated-title">
+      <div>
+        <h3>Showroom Analysis</h3>
+        <p>Phân tích hiệu quả truyền thông của 5 showroom · ${month ? `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}` : 'Tất cả thời gian'}</p>
+      </div>
+    </div>
+    <div class="showroom-summary-grid">
+      <div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div>
+      <div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div>
+      <div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div>
+      <div><span>Showroom nổi bật</span><b>${escapeHtml(best && best.reach ? best.showroom : 'Chưa có dữ liệu')}</b></div>
+    </div>
+    <div class="showroom-communication-grid">
+      ${rows.map(row => `<article class="showroom-communication-card">
+        <div class="showroom-communication-head"><h4>${escapeHtml(row.showroom)}</h4><span>${row.posts} bài</span></div>
+        <div class="showroom-communication-kpis">
+          <div><span>Reach</span><b>${formatMetricNumber(row.reach)}</b></div>
+          <div><span>Engagement</span><b>${formatMetricNumber(row.engagement)}</b></div>
+          <div><span>Engagement rate</span><b>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</b></div>
+          <div><span>Followers tăng</span><b>${formatMetricNumber(row.follow)}</b></div>
+        </div>
+        <p><span>Top bài:</span> ${escapeHtml(row.topPost ? row.topPost.title || 'Bài đăng không tiêu đề' : 'Chưa có dữ liệu')}</p>
+      </article>`).join('')}
+    </div>
+    <div class="platform-comparison showroom-comparison">
+      <h4>So sánh hiệu quả truyền thông showroom</h4>
+      <div class="platform-table-wrap"><table>
+        <thead><tr><th>Showroom</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Followers tăng</th><th>Số bài</th></tr></thead>
+        <tbody>${rows.map(row => `<tr><td><b>${escapeHtml(row.showroom)}</b></td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${formatMetricNumber(row.follow)}</td><td>${row.posts}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
 }
 
 function renderMonthlyTrendsDashboard(){
@@ -988,7 +1092,7 @@ function renderMonthlyTrendsDashboard(){
   ];
   target.innerHTML = `<div class="dedicated-title"><div><h3>Monthly Trends</h3><p>Xu hướng theo thời gian · Năm ${selectedYear}</p></div></div>
     <div class="monthly-chart-grid">${series.map(([label,aliases]) => {
-      const values = months.map(month => sumPostAliases(posts.filter(post => getMonthKey(post.post_date) === month), aliases));
+      const values = months.map(month => sumPostAliases(posts.filter(post => belongsToReportShowrooms(post) && getMonthKey(post.post_date) === month), aliases));
       const max = Math.max(...values,1);
       return `<section class="monthly-chart"><h4>${label} theo tháng</h4><div class="trend-columns">${values.map((number,index) => `<div><b title="${formatMetricNumber(number)}" style="height:${Math.max(number ? 8 : 2, number/max*100)}%"></b><span>T${index+1}</span></div>`).join('')}</div></section>`;
     }).join('')}</div>`;
@@ -1075,6 +1179,15 @@ function sortPosts(items, sort){
 }
 
 function renderPosts(){
+  if($('postSearchInput') && $('postSearchInput').value !== $('searchInput').value){
+    $('postSearchInput').value = $('searchInput').value;
+  }
+  if($('postTablePeriodLabel')){
+    const month = $('monthFilter').value;
+    $('postTablePeriodLabel').innerText = month
+      ? `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}`
+      : 'Tất cả thời gian';
+  }
   const result = getFilteredPosts();
   updateGoogleMapSection();
   updateChannelAccountSection();
@@ -1121,6 +1234,7 @@ function updateWorkspaceActions(){
   document.querySelectorAll('.top-actions').forEach(el => {
     el.classList.toggle('is-hidden', currentShowroom === 'all' || currentPlatform === 'Google Maps');
   });
+  if($('btnExportPdf')) $('btnExportPdf').classList.toggle('is-hidden', currentShowroom !== 'all' || currentPlatform !== 'all');
 }
 
 function getStatusClass(status){
@@ -1210,6 +1324,10 @@ function renderShowroomDashboard(){
           <input type="url" placeholder="Dán ${escapeHtml(linkLabel.toLowerCase())}" value="${escapeHtml(linkValue)}" data-dashboard-link-platform="${escapeHtml(platform)}" data-dashboard-link-showroom="${escapeHtml(currentShowroom)}">
         </label>
         <div class="kpi-input-grid">
+          <div class="monthly-kpi-heading">
+            <b>KPI theo tháng</b>
+            <span>${month ? `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}` : 'Vui lòng chọn tháng'}</span>
+          </div>
           <label>${isWebsite ? 'Lượt xem trang' : 'Reach'}<input type="number" min="0" value="${monthlyKpi.reach}" data-kpi-field="reach" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
           <label>${isWebsite ? 'Phiên truy cập' : 'Engagement'}<input type="number" min="0" value="${monthlyKpi.engagement}" data-kpi-field="engagement" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
           <label>${isWebsite ? 'Người dùng' : 'Follow'}<input type="number" min="0" value="${monthlyKpi.follow}" data-kpi-field="follow" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
@@ -2644,7 +2762,9 @@ function getMonthPosts(){
   return posts.filter(p => {
     const matchMonth = !month || getMonthKey(p.post_date) === month;
     const matchPlatform = platformMatches(p.platform, currentPlatform);
-    const matchShowroom = showroomMatches(p.showroom, currentShowroom);
+    const matchShowroom = currentShowroom === 'all'
+      ? belongsToReportShowrooms(p)
+      : showroomMatches(p.showroom, currentShowroom);
     return matchMonth && matchPlatform && matchShowroom;
   });
 }
@@ -3563,6 +3683,85 @@ async function importMetaRows(){
     button.disabled = false;
     button.innerText = 'Nhập dữ liệu';
   }
+}
+
+function getAllShowroomReportPosts(month){
+  return posts.filter(post => {
+    if(month && getMonthKey(post.post_date) !== month) return false;
+    const assigned = showroomList(post.showroom);
+    return assigned.some(showroom => reportShowroomNames.includes(showroom));
+  });
+}
+
+function exportPdfReport(){
+  if(currentShowroom !== 'all' || currentPlatform !== 'all'){
+    alert('Xuất PDF chỉ áp dụng tại tab Tất cả showroom.');
+    return;
+  }
+  const month = $('monthFilter').value;
+  if(!month){
+    alert('Vui lòng chọn tháng trước khi xuất PDF.');
+    return;
+  }
+  const source = getAllShowroomReportPosts(month);
+  if(!source.length){
+    alert('Không có dữ liệu trong tháng đã chọn để xuất PDF.');
+    return;
+  }
+  const periodLabel = `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}`;
+  const units = reportShowroomNames.map(showroom => getShowroomCommunicationTotals(showroom, month));
+  const total = units.reduce((acc, row) => {
+    acc.posts += row.posts;
+    acc.reach += row.reach;
+    acc.engagement += row.engagement;
+    acc.follow += row.follow;
+    return acc;
+  }, { posts:0, reach:0, engagement:0, follow:0 });
+  const platformNames = ['Facebook','TikTok','Website'];
+  const platformRows = platformNames.map(platform => {
+    const items = source.filter(post => platformMatches(post.platform, platform));
+    const reach = sumPostAliases(items, ['Số người tiếp cận','Reach']);
+    const engagement = totalEngagementForPosts(items);
+    return { platform, posts:items.length, reach, engagement, rate:reach ? engagement / reach * 100 : 0 };
+  });
+  const topPosts = source
+    .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
+    .sort((a,b) => b.value - a.value)
+    .slice(0, 5);
+  const reportWindow = window.open('', '_blank');
+  if(!reportWindow){
+    alert('Trình duyệt đang chặn cửa sổ báo cáo. Vui lòng cho phép pop-up rồi thử lại.');
+    return;
+  }
+  reportWindow.opener = null;
+  const unitRows = units.map(row => `<tr><td>${escapeHtml(showroomDisplayName(row.showroom))}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
+  const platformTable = platformRows.map(row => `<tr><td>${row.platform}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.rate ? row.rate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
+  const topRows = topPosts.map((item,index) => `<tr><td>${index+1}</td><td>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</td><td>${escapeHtml(item.post.platform || '-')}</td><td>${escapeHtml(item.post.showroom || '-')}</td><td>${formatMetricNumber(item.value)}</td></tr>`).join('');
+  const postRows = source.slice(0, 100).map((post,index) => `<tr><td>${index+1}</td><td>${formatDate(post.post_date)}</td><td>${escapeHtml(post.platform || '-')}</td><td>${escapeHtml(post.showroom || '-')}</td><td>${escapeHtml(post.title || '-')}</td></tr>`).join('');
+  reportWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo truyền thông ${periodLabel}</title>
+  <style>
+    @page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#172033;background:#fff;font-size:10px}
+    header{padding:18px 20px;background:linear-gradient(135deg,#071b35,#0e7490);color:#fff;border-radius:12px;margin-bottom:16px}
+    header small{letter-spacing:1.5px;text-transform:uppercase;color:#a5f3fc}header h1{margin:7px 0 4px;font-size:24px}header p{margin:0;color:#dbeafe}
+    h2{font-size:15px;margin:20px 0 8px;color:#0f3b62;border-left:4px solid #06b6d4;padding-left:8px}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.summary div{padding:12px;border:1px solid #dbe5ef;border-radius:9px;background:#f7fafc}
+    .summary span{display:block;color:#64748b}.summary b{display:block;margin-top:5px;font-size:17px;color:#0f3b62}
+    table{width:100%;border-collapse:collapse;page-break-inside:auto}thead{display:table-header-group}tr{page-break-inside:avoid}
+    th{padding:8px;background:#0f3b62;color:#fff;text-align:left}td{padding:7px;border-bottom:1px solid #dbe5ef;vertical-align:top}tbody tr:nth-child(even){background:#f7fafc}
+    .note{margin-top:12px;color:#64748b;font-size:9px}.footer{margin-top:20px;padding-top:8px;border-top:1px solid #dbe5ef;color:#64748b;text-align:right}
+    @media print{.no-print{display:none}}.no-print{position:fixed;right:18px;top:18px;padding:10px 14px;border:0;border-radius:8px;background:#06b6d4;color:#062033;font-weight:bold;cursor:pointer}
+  </style></head><body>
+  <button class="no-print" onclick="window.print()">Lưu thành PDF</button>
+  <header><small>BYD NEG · Báo cáo quản trị truyền thông</small><h1>Báo cáo tổng hợp Tất cả showroom</h1><p>${periodLabel} · Trụ sở chính, Phú Quốc, Cần Thơ, An Giang, Kiên Giang, Tiền Giang</p></header>
+  <section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>
+  <h2>So sánh 6 đơn vị</h2><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table>
+  <h2>Hiệu quả theo nền tảng</h2><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table>
+  <h2>Top 5 bài đăng</h2><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table>
+  <h2>Danh sách bài đăng trong kỳ</h2><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table>
+  <p class="note">Báo cáo được tổng hợp từ dữ liệu hiện có của 6 đơn vị trong tháng được chọn. Danh sách chi tiết hiển thị tối đa 100 bài; dùng Xuất Excel để lấy toàn bộ dữ liệu.</p>
+  <div class="footer">SocialHub BYD NEG · Xuất ngày ${new Date().toLocaleDateString('vi-VN')}</div>
+  <script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+  reportWindow.document.close();
 }
 
 function openExportModal(){

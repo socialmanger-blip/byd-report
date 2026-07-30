@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260730-18" />
+  <link rel="stylesheet" href="style.css?v=20260730-20" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -147,6 +147,7 @@
             <div class="bi-filter-actions">
               <button id="btnReload">Tải lại</button>
               <button id="btnOpenExport">Xuất Excel</button>
+              <button id="btnExportPdf" class="pdf-export-button">Xuất PDF</button>
             </div>
           </aside>
 
@@ -351,6 +352,16 @@
         <div class="sop-guide-list" id="photoSopGuideList"></div>
       </section>
 
+      <div class="post-table-toolbar post-content">
+        <div>
+          <b>Bài đăng trong tháng đã chọn</b>
+          <span id="postTablePeriodLabel">Danh sách bài đăng</span>
+        </div>
+        <label>
+          <span>Tìm bài viết</span>
+          <input id="postSearchInput" type="search" placeholder="Nhập tiêu đề, ghi chú, nền tảng hoặc showroom..." />
+        </label>
+      </div>
       <div class="table-wrap post-content">
         <table>
           <thead>
@@ -543,6 +554,6 @@
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260730-19"></script>
+  <script src="app.js?v=20260730-20"></script>
 </body>
 </html>
