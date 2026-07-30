@@ -3381,6 +3381,53 @@ textarea:focus {
   .bi-view-selector select { width: 100%; min-width: 0; }
 }
 
+.bi-dashboard:not(.view-overview) [data-overview-only] { display: none !important; }
+.bi-dashboard.view-platform .filter-status,
+.bi-dashboard.view-platform .filter-sort,
+.bi-dashboard.view-showroom .filter-status,
+.bi-dashboard.view-showroom .filter-sort,
+.bi-dashboard.view-monthly .filter-status,
+.bi-dashboard.view-monthly .filter-sort,
+.bi-dashboard.view-monthly .filter-keyword { display: none; }
+.dedicated-tab-panel { grid-column: 1 / -1; min-height: 0 !important; }
+.dedicated-title { display:flex; justify-content:space-between; margin-bottom:14px; }
+.dedicated-title h3 { margin:0; color:#f8fcff; font-size:18px; }
+.dedicated-title p { margin:4px 0 0; color:#94a3b8; font-size:11px; }
+.platform-performance-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.platform-performance-grid.is-single { grid-template-columns:minmax(0, 520px); }
+.platform-performance-card,.platform-comparison,.operation-card,.funnel-card,.monthly-chart { border:1px solid rgba(148,163,184,.14); border-radius:12px; background:rgba(15,31,55,.62); padding:14px; }
+.platform-performance-card h4,.platform-comparison h4,.operation-card h4,.funnel-card h4,.monthly-chart h4 { margin:0 0 12px; color:#e2e8f0; }
+.platform-kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.platform-kpi-grid div { padding:9px; border-radius:8px; background:rgba(8,22,40,.76); }
+.platform-kpi-grid span,.platform-top-post span { display:block; color:#94a3b8; font-size:10px; }
+.platform-kpi-grid b { display:block; margin-top:4px; color:#67e8f9; font-size:17px; }
+.platform-top-post { margin-top:10px; padding-top:10px; border-top:1px solid rgba(148,163,184,.12); }
+.platform-top-post b { display:block; margin-top:4px; color:#f8fcff; font-size:11px; }
+.platform-comparison { margin-top:12px; }
+.platform-table-wrap { overflow-x:auto; }
+.platform-comparison table { width:100%; border-collapse:collapse; color:#cbd5e1; font-size:11px; }
+.platform-comparison th,.platform-comparison td { padding:10px; border-bottom:1px solid rgba(148,163,184,.12); text-align:right; }
+.platform-comparison th:first-child,.platform-comparison td:first-child { text-align:left; }
+.operation-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.operation-card > div:not(.staff-table) { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.operation-card > div > span { padding:10px; border-radius:8px; background:rgba(8,22,40,.76); color:#94a3b8; font-size:10px; }
+.operation-card > div > span b { display:block; margin-top:5px; color:#f8fcff; font-size:16px; }
+.staff-card,.funnel-card { margin-top:12px; }
+.staff-table span { display:grid; grid-template-columns:2fr repeat(3,1fr); gap:8px; padding:9px; color:#cbd5e1; font-size:11px; }
+.staff-table span + span { border-top:1px solid rgba(148,163,184,.12); }
+.staff-table em { font-style:normal; }
+.operation-funnel { display:flex; flex-direction:column; align-items:center; }
+.operation-funnel div { width:var(--funnel-width); display:flex; justify-content:space-between; padding:9px 14px; border-radius:7px; background:linear-gradient(90deg,rgba(37,99,235,.58),rgba(34,211,238,.25)); color:#e2e8f0; font-size:11px; }
+.operation-funnel i { color:#67e8f9; font-style:normal; line-height:18px; }
+.monthly-chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.trend-columns { height:190px; display:grid; grid-template-columns:repeat(12,1fr); align-items:end; gap:5px; padding-top:12px; }
+.trend-columns div { height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; }
+.trend-columns b { width:70%; min-height:2px; border-radius:4px 4px 1px 1px; background:linear-gradient(180deg,#22d3ee,#2563eb); }
+.trend-columns span { color:#94a3b8; font-size:8px; }
+@media (max-width:900px) {
+  .platform-performance-grid,.operation-groups,.monthly-chart-grid { grid-template-columns:1fr; }
+}
+
 .bi-filter-pane,
 .filter-card {
   border-color: var(--tech-line);

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260730-14" />
+  <link rel="stylesheet" href="style.css?v=20260730-17" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -91,6 +91,7 @@
               <option value="all">Tất cả nền tảng</option>
               <option value="Facebook">Facebook</option>
               <option value="TikTok">TikTok</option>
+              <option value="Website">Website</option>
               <option value="Zalo OA">Zalo OA</option>
               <option value="YouTube">YouTube</option>
               <option value="Google Maps">Google Maps</option>
@@ -114,7 +115,7 @@
         </div>
         <div class="bi-layout">
           <aside class="bi-filter-pane">
-            <div class="filter-card">
+            <div class="filter-card filter-keyword">
               <label>Tháng</label>
               <div class="period-picker" id="periodPicker">
                 <input id="monthFilter" type="hidden" />
@@ -133,17 +134,17 @@
                 </div>
               </div>
             </div>
-            <div class="filter-card">
+            <div class="filter-card filter-year">
               <label>Từ khóa</label>
               <input id="searchInput" placeholder="Tìm bài đăng..." />
             </div>
-            <div class="filter-card">
+            <div class="filter-card filter-status">
               <label>Năm</label>
               <select id="yearFilter">
                 <option value="all">Tất cả</option>
               </select>
             </div>
-            <div class="filter-card">
+            <div class="filter-card filter-sort">
               <label>Trạng thái</label>
               <select id="statusFilter">
                 <option value="all">Tất cả</option>
@@ -169,7 +170,7 @@
           </aside>
 
           <div class="bi-canvas">
-            <section class="cards report-cards">
+            <section class="cards report-cards" data-overview-only>
               <div class="card"><b id="totalCount">0</b><span># of Post</span></div>
               <div class="card"><b id="doneCount">0</b><span>Đã đăng</span></div>
               <div class="card"><b id="pendingCount">0</b><span>Chờ duyệt</span></div>
@@ -178,7 +179,7 @@
             </section>
 
             <section class="report-grid">
-              <div class="report-panel heatmap-panel" data-bi-panel="overview platform showroom monthly">
+              <div class="report-panel heatmap-panel" data-bi-panel="overview">
                 <div class="panel-head heatmap-toolbar">
                   <div>
                     <h4>Hiệu quả khung giờ đăng bài</h4>
@@ -202,7 +203,7 @@
                 <div id="postingHeatmap" class="posting-heatmap"></div>
                 <div id="heatmapPostDetails" class="heatmap-post-details is-hidden" aria-live="polite"></div>
               </div>
-              <div class="report-panel panel-trend performance-summary-panel" data-bi-panel="overview platform showroom monthly">
+              <div class="report-panel panel-trend performance-summary-panel" data-bi-panel="overview">
                 <div class="panel-head">
                   <div>
                     <h4>Hiệu quả nội dung</h4>
@@ -211,7 +212,7 @@
                 </div>
                 <div id="performanceSummary" class="performance-summary"></div>
               </div>
-              <div class="report-panel panel-trend month-comparison-panel" data-bi-panel="overview monthly">
+              <div class="report-panel panel-trend month-comparison-panel" data-bi-panel="overview">
                 <div class="panel-head">
                   <div>
                     <h4>So với tháng trước</h4>
@@ -220,7 +221,7 @@
                 </div>
                 <div id="monthComparison" class="month-comparison"></div>
               </div>
-              <div class="report-panel panel-trend top-posts-panel" data-bi-panel="overview platform showroom monthly">
+              <div class="report-panel panel-trend top-posts-panel" data-bi-panel="overview">
                 <div class="panel-head">
                   <div>
                     <h4>Bài đăng hiệu quả nhất</h4>
@@ -232,7 +233,7 @@
                 </div>
                 <div id="topPerformingPosts" class="top-performing-posts"></div>
               </div>
-              <div class="report-panel panel-wide" data-bi-panel="overview monthly">
+              <div class="report-panel panel-wide" data-bi-panel="overview">
                 <div class="panel-head">
                   <h4>Total Posts by Week</h4>
                   <select class="chart-type-select" data-chart-target="weekStats">
@@ -243,7 +244,7 @@
                 </div>
                 <div id="weekStats" class="week-stats"></div>
               </div>
-              <div class="report-panel" data-bi-panel="overview platform">
+              <div class="report-panel" data-bi-panel="overview">
                 <div class="panel-head">
                   <h4># of Post by Platform</h4>
                   <select class="chart-type-select" data-chart-target="platformStats">
@@ -254,7 +255,7 @@
                 </div>
                 <div id="platformStats" class="mini-stats"></div>
               </div>
-              <div class="report-panel" data-bi-panel="overview showroom">
+              <div class="report-panel" data-bi-panel="overview">
                 <div class="panel-head">
                   <h4># of Post by Showroom</h4>
                   <select class="chart-type-select" data-chart-target="showroomStats">
@@ -265,7 +266,7 @@
                 </div>
                 <div id="showroomStats" class="mini-stats"></div>
               </div>
-              <div class="report-panel panel-trend" data-bi-panel="overview monthly">
+              <div class="report-panel panel-trend" data-bi-panel="overview">
                 <div class="panel-head">
                   <h4># of Post by Day</h4>
                   <select class="chart-type-select" data-chart-target="dailyTrend">
@@ -275,6 +276,15 @@
                   </select>
                 </div>
                 <div id="dailyTrend" class="daily-trend"></div>
+              </div>
+              <div class="report-panel dedicated-tab-panel" data-bi-panel="platform">
+                <div id="platformPerformanceDashboard"></div>
+              </div>
+              <div class="report-panel dedicated-tab-panel" data-bi-panel="showroom">
+                <div id="showroomAnalysisDashboard"></div>
+              </div>
+              <div class="report-panel dedicated-tab-panel monthly-only-panel" data-bi-panel="monthly">
+                <div id="monthlyTrendsDashboard"></div>
               </div>
             </section>
           </div>
@@ -552,6 +562,6 @@
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260730-15"></script>
+  <script src="app.js?v=20260730-17"></script>
 </body>
 </html>

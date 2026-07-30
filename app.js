@@ -902,6 +902,115 @@ function renderTopPerformingPosts(items){
   }).join('');
 }
 
+function sumPostAliases(items, aliases){
+  return items.reduce((total, post) => {
+    const metrics = normalizePerformanceMetrics(post.performance_metrics);
+    return total + aliases.reduce((sum, name) => sum + toNumber(metrics[name]), 0);
+  }, 0);
+}
+
+function platformDashboardMetric(items, aliases){
+  return formatMetricNumber(sumPostAliases(items, aliases));
+}
+
+function renderPlatformPerformanceDashboard(){
+  const target = $('platformPerformanceDashboard');
+  if(!target) return;
+  const selectedMonth = $('monthFilter').value;
+  const scoped = posts.filter(post => !selectedMonth || getMonthKey(post.post_date) === selectedMonth);
+  const definitions = [
+    { name:'Facebook', posts:scoped.filter(p => platformMatches(p.platform, 'Facebook')) },
+    { name:'TikTok', posts:scoped.filter(p => platformMatches(p.platform, 'TikTok')) },
+    { name:'Website', posts:scoped.filter(p => platformMatches(p.platform, 'Website')) }
+  ];
+  const rows = definitions.map(item => {
+    const reach = sumPostAliases(item.posts, ['Số người tiếp cận', 'Reach']);
+    const engagement = totalEngagementForPosts(item.posts);
+    return { ...item, reach, engagement };
+  });
+  const selectedPlatform = $('biPlatformFilter') ? $('biPlatformFilter').value : 'all';
+  const visibleDefinitions = selectedPlatform === 'all'
+    ? definitions
+    : definitions.filter(item => item.name === selectedPlatform);
+  const cards = visibleDefinitions.map(item => {
+    const top = [...item.posts].sort((a,b) => getPostPerformanceValue(b, item.name === 'TikTok' ? 'Lượt xem' : '__engagement__') - getPostPerformanceValue(a, item.name === 'TikTok' ? 'Lượt xem' : '__engagement__'))[0];
+    const metrics = item.name === 'Facebook' ? [
+      ['Reach', platformDashboardMetric(item.posts, ['Số người tiếp cận','Reach'])],
+      ['Engagement', formatMetricNumber(totalEngagementForPosts(item.posts))],
+      ['Followers tăng', platformDashboardMetric(item.posts, ['Lượt theo dõi','Followers tăng','Người theo dõi mới'])],
+      ['Số bài', formatMetricNumber(item.posts.length)]
+    ] : item.name === 'TikTok' ? [
+      ['View', platformDashboardMetric(item.posts, ['Lượt xem','Views'])],
+      ['Reach', platformDashboardMetric(item.posts, ['Số người tiếp cận','Reach'])],
+      ['Followers', platformDashboardMetric(item.posts, ['Lượt theo dõi','Followers tăng','Người theo dõi mới'])],
+      ['Số video', formatMetricNumber(item.posts.length)]
+    ] : [
+      ['Visitor', platformDashboardMetric(item.posts, ['Visitor','Người dùng','Lượt xem trang'])],
+      ['Click', platformDashboardMetric(item.posts, ['Lượt click vào liên kết','Click'])],
+      ['Lead', platformDashboardMetric(item.posts, ['Lead','Lead/Form','Khách hàng tiềm năng'])],
+      ['Số bài', formatMetricNumber(item.posts.length)]
+    ];
+    return `<article class="platform-performance-card">
+      <h4>${item.name}</h4>
+      <div class="platform-kpi-grid">${metrics.map(([label,value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('')}</div>
+      <div class="platform-top-post"><span>Top bài</span><b>${escapeHtml(top ? top.title || 'Bài đăng không tiêu đề' : 'Chưa có dữ liệu')}</b></div>
+    </article>`;
+  }).join('');
+  target.innerHTML = `
+    <div class="dedicated-title"><div><h3>Platform Performance</h3><p>Hiệu quả marketing trên từng nền tảng</p></div></div>
+    <div class="platform-performance-grid ${visibleDefinitions.length === 1 ? 'is-single' : ''}">${cards || '<div class="empty-mini">Nền tảng này chưa có trong nhóm báo cáo Facebook, TikTok và Website.</div>'}</div>
+    <div class="platform-comparison">
+      <h4>So sánh Platform</h4>
+      <div class="platform-table-wrap"><table><thead><tr><th>Platform</th><th>Reach</th><th>Engagement</th><th>Posts</th></tr></thead>
+      <tbody>${rows.map(row => `<tr><td><b>${row.name}</b></td><td>${formatMetricNumber(row.reach)}</td><td>${row.reach ? (row.engagement / row.reach * 100).toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts.length}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
+}
+
+function renderShowroomAnalysisDashboard(){
+  const target = $('showroomAnalysisDashboard');
+  if(!target) return;
+  const items = getMonthPosts();
+  const value = aliases => sumPostAliases(items, aliases);
+  const reach = value(['Số người tiếp cận','Reach']);
+  const lead = value(['Lead','Lead/Form','Khách hàng tiềm năng']);
+  const groups = [
+    ['Sales', [['Lead',lead],['Khách đến showroom',value(['Showroom Visit','Khách đến showroom'])],['Test Drive',value(['Test Drive','Lái thử'])],['Báo giá',value(['Báo giá','Quotation'])],['Đặt cọc',value(['Đặt cọc','Deposit'])],['Bàn giao',value(['Bàn giao','Delivery','Giao xe'])]]],
+    ['Marketing', [['Reach',reach],['Engagement',totalEngagementForPosts(items)],['Chi phí Ads',value(['Chi phí Ads','Marketing Cost','Ads Cost'])],['CPL',lead ? value(['Chi phí Ads','Marketing Cost','Ads Cost']) / lead : 0]]],
+    ['Service', [['Xe vào xưởng',value(['Xe vào xưởng','Service Visit'])],['Doanh thu',value(['Doanh thu Service','Service Revenue'])],['CSI',value(['CSI'])]]],
+    ['Inventory', [['Xe tồn',value(['Xe tồn','Inventory'])],['Xe giao',value(['Xe giao','Delivery','Giao xe'])],['Xe nhập',value(['Xe nhập','Inbound'])]]]
+  ];
+  const funnel = [
+    ['Reach',reach],['Lead',lead],['Showroom Visit',value(['Showroom Visit','Khách đến showroom'])],
+    ['Test Drive',value(['Test Drive','Lái thử'])],['Deposit',value(['Đặt cọc','Deposit'])],['Delivery',value(['Bàn giao','Delivery','Giao xe'])]
+  ];
+  target.innerHTML = `
+    <div class="dedicated-title"><div><h3>Showroom Analysis</h3><p>Tổng hợp hiệu quả vận hành ${currentShowroom === 'all' ? 'toàn hệ thống' : showroomDisplayName(currentShowroom)}</p></div></div>
+    <div class="operation-groups">${groups.map(([name,metrics]) => `<section class="operation-card"><h4>${name}</h4><div>${metrics.map(([label,number]) => `<span>${label}<b>${formatMetricNumber(number)}</b></span>`).join('')}</div></section>`).join('')}</div>
+    <section class="operation-card staff-card"><h4>Nhân sự</h4><div class="staff-table"><span><b>TVBH</b><b>Lead</b><b>Cọc</b><b>Giao xe</b></span><span><em>Toàn bộ TVBH</em><b>${formatMetricNumber(lead)}</b><b>${formatMetricNumber(value(['Đặt cọc','Deposit']))}</b><b>${formatMetricNumber(value(['Bàn giao','Delivery','Giao xe']))}</b></span></div></section>
+    <section class="funnel-card"><h4>Funnel vận hành</h4><div class="operation-funnel">${funnel.map(([label,number],index) => `<div style="--funnel-width:${100-index*12}%"><span>${label}</span><b>${formatMetricNumber(number)}</b></div>${index < funnel.length-1 ? '<i>↓</i>' : ''}`).join('')}</div></section>`;
+}
+
+function renderMonthlyTrendsDashboard(){
+  const target = $('monthlyTrendsDashboard');
+  if(!target) return;
+  const selectedYear = $('yearFilter').value !== 'all' ? Number($('yearFilter').value) : new Date().getFullYear();
+  const months = Array.from({length:12}, (_,i) => `${selectedYear}-${String(i+1).padStart(2,'0')}`);
+  const series = [
+    ['Reach',['Số người tiếp cận','Reach']],
+    ['Lead',['Lead','Lead/Form','Khách hàng tiềm năng']],
+    ['Đặt cọc',['Đặt cọc','Deposit']],
+    ['Giao xe',['Bàn giao','Delivery','Giao xe']],
+    ['Doanh thu',['Doanh thu','Revenue']],
+    ['Chi phí Marketing',['Chi phí Ads','Marketing Cost','Ads Cost']]
+  ];
+  target.innerHTML = `<div class="dedicated-title"><div><h3>Monthly Trends</h3><p>Xu hướng theo thời gian · Năm ${selectedYear}</p></div></div>
+    <div class="monthly-chart-grid">${series.map(([label,aliases]) => {
+      const values = months.map(month => sumPostAliases(posts.filter(post => getMonthKey(post.post_date) === month), aliases));
+      const max = Math.max(...values,1);
+      return `<section class="monthly-chart"><h4>${label} theo tháng</h4><div class="trend-columns">${values.map((number,index) => `<div><b title="${formatMetricNumber(number)}" style="height:${Math.max(number ? 8 : 2, number/max*100)}%"></b><span>T${index+1}</span></div>`).join('')}</div></section>`;
+    }).join('')}</div>`;
+}
+
 function previousMonthKey(month){
   if(!month) return '';
   const [year, number] = month.split('-').map(Number);
@@ -2863,6 +2972,9 @@ function markAllNotificationsRead(){
 
 function updateStats(){
   const monthPosts = getMonthPosts();
+  renderPlatformPerformanceDashboard();
+  renderShowroomAnalysisDashboard();
+  renderMonthlyTrendsDashboard();
   renderPerformanceSummary(monthPosts);
   renderTopPerformingPosts(monthPosts);
   renderMonthComparison();
