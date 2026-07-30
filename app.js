@@ -21,6 +21,7 @@ const mediaLibraryStorageKey = 'socialhub_media_library_v1';
 const photoSopGuideStorageKey = 'socialhub_photo_sop_guide_v1';
 const fallbackPostMetricsStorageKey = 'socialhub_post_metrics_fallback_v1';
 const notificationReadStorageKey = 'socialhub_notification_read_v1';
+const metaImportHistoryType = 'meta_import_history';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
@@ -227,6 +228,7 @@ function bindEvents(){
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
   bindClick('btnRunMetaImport', importMetaRows);
+  bindClick('btnUndoMetaImport', undoLastMetaImport);
   $('metaCsvInput').addEventListener('change', handleMetaCsvFile);
   bindClick('btnCloseExport', closeExportModal);
   bindClick('btnCancelExport', closeExportModal);
@@ -1002,6 +1004,9 @@ function getShowroomCommunicationTotals(showroom, month){
   const postLike = sumPostAliases(items, ['Lượt thích và cảm xúc','Like']);
   const reach = postReach || monthly.reach;
   const engagement = postEngagement || monthly.engagement;
+  const topPost = items
+    .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
+    .sort((a,b) => b.value - a.value)[0];
   return {
     showroom,
     items,
@@ -1010,7 +1015,8 @@ function getShowroomCommunicationTotals(showroom, month){
     engagement,
     follow:postFollow || monthly.follow,
     like:postLike || monthly.like,
-    views:sumPostAliases(items, ['Lượt xem','Views'])
+    views:sumPostAliases(items, ['Lượt xem','Views']),
+    topPost:topPost ? topPost.post : null
   };
 }
 
@@ -1059,6 +1065,7 @@ function renderShowroomAnalysisDashboard(){
           <div><span>Engagement</span><b>${formatMetricNumber(row.engagement)}</b></div>
           <div><span>Followers tăng</span><b>${formatMetricNumber(row.follow)}</b></div>
         </div>
+        <p><span>Top bài:</span> ${escapeHtml(row.topPost ? row.topPost.title || 'Bài đăng không tiêu đề' : 'Chưa có dữ liệu')}</p>
       </article>`).join('')}
     </div>
     <div class="platform-comparison showroom-comparison">
@@ -3652,6 +3659,19 @@ async function importMetaRows(){
     const createMissing = $('metaCreateMissing').checked;
     const matchedItems = metaImportRows.filter(item => item.match);
     const newItems = metaImportRows.filter(item => !item.match && createMissing);
+    const importHistory = {
+      version:1,
+      importedAt:new Date().toISOString(),
+      context:{ ...metaImportContext },
+      updated:matchedItems.map(item => ({
+        id:item.match.id,
+        post_link:item.match.post_link || '',
+        post_time:item.match.post_time || null,
+        performance_metrics:normalizePerformanceMetrics(item.match.performance_metrics)
+      })),
+      createdIds:[],
+      createdMetricKeys:[]
+    };
     totals.skipped = metaImportRows.length - matchedItems.length - newItems.length;
 
     button.innerText = `Đang cập nhật 0/${matchedItems.length}...`;
@@ -3684,20 +3704,25 @@ async function importMetaRows(){
         thumbnail_url:''
       };
     });
+    const insertedPosts = [];
     for(let index = 0; index < newPayloads.length; index += 50){
       const chunk = newPayloads.slice(index, index + 50);
       button.innerText = `Đang tạo ${totals.created}/${newPayloads.length}...`;
-      const { error } = await supabaseClient.from('posts').insert(chunk);
+      const { data, error } = await supabaseClient.from('posts').insert(chunk).select('*');
       if(error) throw error;
+      insertedPosts.push(...(data || []));
       totals.created += chunk.length;
     }
 
     button.innerText = 'Đang lưu KPI...';
     const metricEntries = [
       ...matchedItems.map(item => ({ post:item.match, metrics:item.metrics })),
-      ...newItems.map((item, index) => ({ post:newPayloads[index], metrics:item.metrics }))
+      ...newItems.map((item, index) => ({ post:insertedPosts[index] || newPayloads[index], metrics:item.metrics }))
     ];
     await saveFallbackPostMetricsBatch(metricEntries);
+    importHistory.createdIds = insertedPosts.map(post => post.id).filter(Boolean);
+    importHistory.createdMetricKeys = insertedPosts.map(postMetricsFallbackKey);
+    await saveMetaImportHistory(importHistory);
 
     closeMetaImportModal();
     await loadPosts();
@@ -3708,6 +3733,116 @@ async function importMetaRows(){
   }finally{
     button.disabled = false;
     button.innerText = 'Nhập dữ liệu';
+  }
+}
+
+async function saveMetaImportHistory(history){
+  const { error:deleteError } = await supabaseClient
+    .from('media_library')
+    .delete()
+    .eq('type', metaImportHistoryType);
+  if(deleteError) throw deleteError;
+  const { error } = await supabaseClient.from('media_library').insert({
+    name:JSON.stringify(history),
+    folder:'last-meta-import',
+    url:'#meta-import-history',
+    type:metaImportHistoryType,
+    size:0,
+    uploaded_at:history.importedAt
+  });
+  if(error) throw error;
+}
+
+async function loadLastMetaImportHistory(){
+  const { data, error } = await supabaseClient
+    .from('media_library')
+    .select('id,name,uploaded_at')
+    .eq('type', metaImportHistoryType)
+    .order('uploaded_at', { ascending:false })
+    .limit(1);
+  if(error) throw error;
+  if(!data || !data.length) return null;
+  return { rowId:data[0].id, ...JSON.parse(data[0].name || '{}') };
+}
+
+async function removeFallbackPostMetrics(keys){
+  const uniqueKeys = [...new Set((keys || []).filter(Boolean))];
+  if(!uniqueKeys.length) return;
+  const saved = loadFallbackPostMetrics();
+  uniqueKeys.forEach(key => {
+    delete saved[key];
+    delete cloudPostMetricsFallback[key];
+  });
+  localStorage.setItem(fallbackPostMetricsStorageKey, JSON.stringify(saved));
+  for(let index = 0; index < uniqueKeys.length; index += 50){
+    const { error } = await supabaseClient
+      .from('media_library')
+      .delete()
+      .eq('type', 'post_metrics')
+      .in('folder', uniqueKeys.slice(index, index + 50));
+    if(error) throw error;
+  }
+}
+
+async function undoLastMetaImport(){
+  const button = $('btnUndoMetaImport');
+  try{
+    button.disabled = true;
+    button.innerText = 'Đang kiểm tra...';
+    const history = await loadLastMetaImportHistory();
+    if(!history){
+      alert('Chưa có lần nhập Meta nào được ghi nhận để hoàn tác.');
+      return;
+    }
+    const destination = history.context && history.context.showroom
+      ? showroomDisplayName(history.context.showroom)
+      : 'Tất cả showroom';
+    const importedAt = new Date(history.importedAt).toLocaleString('vi-VN');
+    const message = `Hoàn tác lần nhập ${importedAt} tại ${destination} · ${(history.context && history.context.platform) || 'Facebook'}?\n\n${(history.createdIds || []).length} bài tạo mới sẽ bị xóa và ${(history.updated || []).length} bài cũ sẽ được khôi phục.`;
+    if(!confirm(message)) return;
+
+    button.innerText = 'Đang hoàn tác...';
+    const createdIds = (history.createdIds || []).filter(Boolean);
+    for(let index = 0; index < createdIds.length; index += 50){
+      const { error } = await supabaseClient.from('posts').delete().in('id', createdIds.slice(index, index + 50));
+      if(error) throw error;
+    }
+
+    for(const original of history.updated || []){
+      let { error } = await supabaseClient.from('posts').update({
+        post_link:original.post_link || '',
+        post_time:original.post_time || null,
+        performance_metrics:original.performance_metrics || {}
+      }).eq('id', original.id);
+      if(error && isMissingPerformanceMetricsColumn(error)){
+        ({ error } = await supabaseClient.from('posts').update({
+          post_link:original.post_link || '',
+          post_time:original.post_time || null
+        }).eq('id', original.id));
+      }
+      if(error) throw error;
+    }
+
+    await removeFallbackPostMetrics(history.createdMetricKeys || []);
+    await saveFallbackPostMetricsBatch((history.updated || []).map(original => ({
+      post:posts.find(post => post.id === original.id) || original,
+      metrics:original.performance_metrics || {}
+    })));
+    const { error:historyDeleteError } = await supabaseClient
+      .from('media_library')
+      .delete()
+      .eq('id', history.rowId);
+    if(historyDeleteError) throw historyDeleteError;
+
+    closeMetaImportModal();
+    await loadPosts();
+    alert('Đã hoàn tác lần nhập Meta gần nhất và khôi phục dữ liệu trước đó.');
+  }catch(err){
+    console.error(err);
+    alert('Không thể hoàn tác lần nhập: ' + err.message);
+  }finally{
+    button.disabled = false;
+    button.innerText = 'Hoàn tác lần nhập gần nhất';
   }
 }
 
