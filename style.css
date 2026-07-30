@@ -3350,6 +3350,37 @@ textarea:focus {
   box-shadow: inset 0 -3px 0 var(--tech-cyan);
 }
 
+.bi-view-context {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--tech-line);
+  background: rgba(8, 22, 40, .82);
+}
+.bi-view-context [data-view-context] { display: none; }
+.bi-view-context [data-view-context].is-active { display: flex; }
+.bi-view-context-copy { flex-direction: column; gap: 2px; }
+.bi-view-context-copy b { color: #e2e8f0; font-size: 12px; }
+.bi-view-context-copy span { color: #94a3b8; font-size: 10px; }
+.bi-view-selector { align-items: center; gap: 12px; }
+.bi-view-selector > span { color: #cbd5e1; font-size: 11px; font-weight: 800; }
+.bi-view-selector select {
+  min-width: 210px;
+  height: 36px;
+  padding: 0 34px 0 11px;
+  border: 1px solid rgba(34,211,238,.28);
+  border-radius: 8px;
+  background: #0b1c31;
+  color: #f8fcff;
+  font-weight: 700;
+}
+@media (max-width: 720px) {
+  .bi-view-context { padding: 9px 12px; }
+  .bi-view-selector { width: 100%; align-items: stretch; flex-direction: column; gap: 5px; }
+  .bi-view-selector select { width: 100%; min-width: 0; }
+}
+
 .bi-filter-pane,
 .filter-card {
   border-color: var(--tech-line);

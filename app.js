@@ -22,7 +22,7 @@ const fallbackPostMetricsStorageKey = 'socialhub_post_metrics_fallback_v1';
 const notificationReadStorageKey = 'socialhub_notification_read_v1';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
-const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
+const reportShowroomNames = ['Phú Quốc', 'Cần Thơ', 'Tiền Giang', 'An Giang', 'Kiên Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
 const standardPostMetricNames = [
@@ -273,8 +273,29 @@ function bindEvents(){
   $('moveMediaModal').addEventListener('click', (e)=>{ if(e.target.id==='moveMediaModal') closeMoveMediaModal(); });
   $('imageInput').addEventListener('change', previewImages);
   document.querySelectorAll('[data-bi-view]').forEach(button => {
-    button.addEventListener('click', () => setBiView(button.dataset.biView));
+    button.addEventListener('click', () => {
+      setBiView(button.dataset.biView);
+      renderPosts();
+    });
   });
+  if($('biPlatformFilter')){
+    $('biPlatformFilter').addEventListener('change', event => {
+      currentPlatform = event.target.value;
+      currentShowroom = 'all';
+      setActivePlatformNav(currentPlatform);
+      setActiveShowroomNav('all');
+      renderPosts();
+    });
+  }
+  if($('biShowroomFilter')){
+    $('biShowroomFilter').addEventListener('change', event => {
+      currentShowroom = event.target.value;
+      currentPlatform = 'all';
+      setActiveShowroomNav(currentShowroom);
+      setActivePlatformNav('all');
+      renderPosts();
+    });
+  }
   setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -314,6 +335,23 @@ function setBiView(view = 'overview'){
     const views = String(panel.dataset.biPanel || '').split(' ');
     panel.classList.toggle('is-hidden', view !== 'overview' && !views.includes(view));
   });
+  document.querySelectorAll('[data-view-context]').forEach(control => {
+    control.classList.toggle('is-active', control.dataset.viewContext === view);
+  });
+  if(view === 'overview' || view === 'monthly'){
+    currentPlatform = 'all';
+    currentShowroom = 'all';
+  }else if(view === 'platform'){
+    currentShowroom = 'all';
+    currentPlatform = $('biPlatformFilter') ? $('biPlatformFilter').value : 'all';
+  }else if(view === 'showroom'){
+    currentPlatform = 'all';
+    currentShowroom = $('biShowroomFilter') ? $('biShowroomFilter').value : 'all';
+  }
+  if($('biPlatformFilter')) $('biPlatformFilter').value = view === 'platform' ? currentPlatform : 'all';
+  if($('biShowroomFilter')) $('biShowroomFilter').value = view === 'showroom' ? currentShowroom : 'all';
+  setActivePlatformNav(currentPlatform);
+  setActiveShowroomNav(currentShowroom);
 }
 
 function setActivePlatformNav(platform){
