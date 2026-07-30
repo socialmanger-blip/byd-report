@@ -12,6 +12,7 @@ let cloudPostMetricsFallback = {};
 let metaImportRows = [];
 let metaImportContext = { platform:'Facebook', showroom:null };
 let dashboardNotifications = [];
+let activeNotificationId = null;
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -282,14 +283,6 @@ function bindEvents(){
   document.querySelectorAll('[data-bi-view]').forEach(button => {
     button.addEventListener('click', () => {
       const view = button.dataset.biView;
-      if(view === 'overview' || view === 'monthly'){
-        currentPlatform = 'all';
-        currentShowroom = 'all';
-      }else if(view === 'platform'){
-        currentShowroom = 'all';
-      }else if(view === 'showroom'){
-        currentPlatform = 'all';
-      }
       setBiView(view);
       renderPosts();
     });
@@ -915,7 +908,12 @@ function renderPlatformPerformanceDashboard(){
   const target = $('platformPerformanceDashboard');
   if(!target) return;
   const selectedMonth = $('monthFilter').value;
-  const scoped = posts.filter(post => belongsToReportShowrooms(post) && (!selectedMonth || getMonthKey(post.post_date) === selectedMonth));
+  const scoped = posts.filter(post => {
+    const matchShowroom = currentShowroom === 'all'
+      ? belongsToReportShowrooms(post)
+      : showroomMatches(post.showroom, currentShowroom);
+    return matchShowroom && (!selectedMonth || getMonthKey(post.post_date) === selectedMonth);
+  });
   const definitions = [
     { name:'Facebook', posts:scoped.filter(p => platformMatches(p.platform, 'Facebook')) },
     { name:'TikTok', posts:scoped.filter(p => platformMatches(p.platform, 'TikTok')) },
@@ -1092,7 +1090,12 @@ function renderMonthlyTrendsDashboard(){
   ];
   target.innerHTML = `<div class="dedicated-title"><div><h3>Monthly Trends</h3><p>Xu hướng theo thời gian · Năm ${selectedYear}</p></div></div>
     <div class="monthly-chart-grid">${series.map(([label,aliases]) => {
-      const values = months.map(month => sumPostAliases(posts.filter(post => belongsToReportShowrooms(post) && getMonthKey(post.post_date) === month), aliases));
+      const values = months.map(month => sumPostAliases(posts.filter(post => {
+        const matchShowroom = currentShowroom === 'all'
+          ? belongsToReportShowrooms(post)
+          : showroomMatches(post.showroom, currentShowroom);
+        return matchShowroom && getMonthKey(post.post_date) === month;
+      }), aliases));
       const max = Math.max(...values,1);
       return `<section class="monthly-chart"><h4>${label} theo tháng</h4><div class="trend-columns">${values.map((number,index) => `<div><b title="${formatMetricNumber(number)}" style="height:${Math.max(number ? 8 : 2, number/max*100)}%"></b><span>T${index+1}</span></div>`).join('')}</div></section>`;
     }).join('')}</div>`;
@@ -2984,12 +2987,26 @@ function buildDashboardNotifications(){
   const scoped = getMonthPosts();
   const notifications = [];
   const missingMetrics = scoped.filter(post => !Object.keys(normalizePerformanceMetrics(post.performance_metrics)).length);
-  if(missingMetrics.length) notifications.push({ id:`missing-metrics-${month}-${missingMetrics.length}`, type:'action', title:`Có ${missingMetrics.length} bài chưa nhập số liệu`, detail:'Bổ sung KPI để báo cáo và Top 5 chính xác hơn.' });
+  if(missingMetrics.length) notifications.push({
+    id:`missing-metrics-${month}-${missingMetrics.length}`,
+    type:'action',
+    title:`Có ${missingMetrics.length} bài chưa nhập số liệu`,
+    detail:'Bổ sung KPI để báo cáo và Top 5 chính xác hơn.',
+    solution:'Mở bài đầu tiên chưa đủ số liệu, nhập Reach, Views và Engagement từ báo cáo nền tảng, sau đó lưu bài. Tiếp tục xử lý các bài còn lại trong danh sách.',
+    postId:missingMetrics[0].id
+  });
   ['Facebook','TikTok','YouTube'].forEach(platform => {
     const latest = posts.filter(post => platformMatches(post.platform, platform) && post.post_date)
       .sort((a,b) => String(b.post_date).localeCompare(String(a.post_date)))[0];
     const days = latest ? Math.floor((now - new Date(`${latest.post_date}T00:00:00`)) / 86400000) : 999;
-    if(days >= 5) notifications.push({ id:`stale-${platform}-${latest ? latest.post_date : 'none'}`, type:'action', title:`${platform} ${days === 999 ? 'chưa có bài đăng' : `${days} ngày chưa đăng bài`}`, detail:'Kiểm tra lại lịch nội dung của kênh.' });
+    if(days >= 5) notifications.push({
+      id:`stale-${platform}-${latest ? latest.post_date : 'none'}`,
+      type:'action',
+      title:`${platform} ${days === 999 ? 'chưa có bài đăng' : `${days} ngày chưa đăng bài`}`,
+      detail:'Kiểm tra lại lịch nội dung của kênh.',
+      solution:`Rà lịch nội dung ${platform}, chọn một bài đang chờ duyệt hoặc tạo bài mới, chốt người phụ trách và thời gian đăng trong 24 giờ tới.`,
+      postId:latest ? latest.id : null
+    });
   });
   const selectedMonth = month || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const previous = previousMonthKey(selectedMonth);
@@ -2998,10 +3015,18 @@ function buildDashboardNotifications(){
   if(reachBefore > 0 && reachNow < reachBefore){
     const drop = Math.round((reachBefore - reachNow) / reachBefore * 100);
     notifications.push({ id:`reach-drop-${selectedMonth}-${drop}`, type:'warning', title:`Reach giảm ${drop}% so với tháng trước`, detail:'Xem lại tần suất đăng và nhóm nội dung hiệu quả.' });
+    notifications[notifications.length - 1].solution = 'So sánh Top 5 bài của hai tháng, giữ lại chủ đề và khung giờ có Reach cao, giảm nội dung kém hiệu quả và bổ sung lịch đăng cho các kênh đang thiếu tần suất.';
   }
   posts.forEach(post => {
     const views = heatmapMetricValue(post, 'Lượt xem');
-    if(views >= 50000) notifications.push({ id:`views-50k-${post.id}`, type:'success', title:'Video đạt trên 50.000 Views', detail:post.title || 'Bài đăng nổi bật', postId:post.id });
+    if(views >= 50000) notifications.push({
+      id:`views-50k-${post.id}`,
+      type:'success',
+      title:'Video đạt trên 50.000 Views',
+      detail:post.title || 'Bài đăng nổi bật',
+      solution:'Lưu lại hook mở đầu, định dạng video, chủ đề và khung giờ đăng. Tạo phiên bản tiếp nối, tái sử dụng CTA hiệu quả và phân phối lại trên các kênh phù hợp.',
+      postId:post.id
+    });
   });
   const read = loadReadNotificationIds();
   dashboardNotifications = notifications.map(item => ({ ...item, read:read.has(item.id) }));
@@ -3023,9 +3048,17 @@ function renderNotificationCenter(){
   $('notificationGroups').innerHTML = groups.map(group => {
     const items = dashboardNotifications.filter(item => item.type === group.type);
     return `<section class="notification-group"><h4>${group.title}</h4>${items.length ? items.map(item => `
-      <button type="button" class="notification-item ${item.read ? 'is-read' : ''}" onclick="readNotification('${escapeJs(item.id)}', ${item.postId || 'null'})">
-        <b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.detail)}</span>
-      </button>`).join('') : '<div class="notification-empty">Không có thông báo</div>'}</section>`;
+      <article class="notification-card ${item.read ? 'is-read' : ''}">
+        <button type="button" class="notification-item" onclick="readNotification('${escapeJs(item.id)}')">
+          <b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.detail)}</span>
+          <small>${activeNotificationId === item.id ? 'Thu gọn hướng xử lý ↑' : 'Xem hướng xử lý →'}</small>
+        </button>
+        ${activeNotificationId === item.id ? `<div class="notification-solution">
+          <strong>Hướng xử lý đề xuất</strong>
+          <p>${escapeHtml(item.solution || 'Kiểm tra dữ liệu liên quan, xác định người phụ trách và cập nhật trạng thái sau khi xử lý.')}</p>
+          ${item.postId ? `<button type="button" onclick="openNotificationPost('${escapeJs(item.id)}', ${item.postId})">Mở đúng bài liên quan</button>` : ''}
+        </div>` : ''}
+      </article>`).join('') : '<div class="notification-empty">Không có thông báo</div>'}</section>`;
   }).join('');
 }
 
@@ -3040,16 +3073,28 @@ function closeNotificationCenter(){
   $('notificationOverlay').classList.remove('is-open');
 }
 
-function readNotification(id, postId){
+function readNotification(id){
   const read = loadReadNotificationIds();
   read.add(id);
   saveReadNotificationIds(read);
+  activeNotificationId = activeNotificationId === id ? null : id;
   renderNotificationCenter();
-  if(postId){
-    closeNotificationCenter();
-    const post = posts.find(item => item.id === postId);
-    if(post) selectReportMonth(getMonthKey(post.post_date));
-  }
+}
+
+function openNotificationPost(id, postId){
+  const read = loadReadNotificationIds();
+  read.add(id);
+  saveReadNotificationIds(read);
+  const post = posts.find(item => item.id === postId);
+  if(!post) return;
+  closeNotificationCenter();
+  const showroom = showroomList(post.showroom)[0];
+  currentShowroom = reportShowroomNames.includes(showroom) ? showroom : 'all';
+  currentPlatform = 'all';
+  selectReportMonth(getMonthKey(post.post_date));
+  setActiveShowroomNav(currentShowroom);
+  setActivePlatformNav(currentPlatform);
+  editPost(postId);
 }
 
 function markAllNotificationsRead(){
