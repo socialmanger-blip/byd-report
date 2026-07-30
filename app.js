@@ -2603,6 +2603,66 @@ function heatmapDayIndex(dateText){
   return (date.getDay() + 6) % 7;
 }
 
+function heatmapPostLink(post){
+  const value = String(post.post_link || '').trim();
+  if(!value) return '';
+  try {
+    const url = new URL(value, window.location.href);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch(_err) {
+    return '';
+  }
+}
+
+function renderHeatmapPostDetails(group, dayName, slot, metric, metricLabel){
+  const target = $('heatmapPostDetails');
+  if(!target) return;
+  const ranked = [...group].sort((a,b) => heatmapMetricValue(b, metric) - heatmapMetricValue(a, metric));
+  const average = ranked.reduce((sum, post) => sum + heatmapMetricValue(post, metric), 0) / Math.max(ranked.length, 1);
+  target.classList.remove('is-hidden');
+  target.innerHTML = `
+    <div class="heatmap-detail-head">
+      <div>
+        <span>Các bài trong khung giờ</span>
+        <h5>${escapeHtml(dayName)} · ${String(slot).padStart(2,'0')}:00</h5>
+        <small>${ranked.length} bài · Trung bình ${formatMetricNumber(average)} ${escapeHtml(metricLabel)}/bài</small>
+      </div>
+      <button type="button" class="heatmap-detail-close" aria-label="Đóng danh sách bài">×</button>
+    </div>
+    <div class="heatmap-detail-list">
+      ${ranked.map((post, index) => {
+        const value = heatmapMetricValue(post, metric);
+        const link = heatmapPostLink(post);
+        const reach = heatmapMetricValue(post, 'Số người tiếp cận');
+        const views = heatmapMetricValue(post, 'Lượt xem');
+        const engagement = getPostPerformanceValue(post, '__engagement__');
+        return `
+          <article class="heatmap-post-item">
+            <div class="heatmap-post-rank">${index + 1}</div>
+            <div class="heatmap-post-main">
+              <div class="heatmap-post-title">
+                <div>
+                  <b>${escapeHtml(post.title || 'Bài đăng không tiêu đề')}</b>
+                  <span>${escapeHtml(post.platform || '-')} · ${escapeHtml(post.showroom || 'Chưa chọn showroom')} · ${formatDate(post.post_date)} ${escapeHtml(post.post_time || '')}</span>
+                </div>
+                <strong>${formatMetricNumber(value)} <small>${escapeHtml(metricLabel)}</small></strong>
+              </div>
+              <div class="heatmap-post-kpis">
+                <span>Reach <b>${formatMetricNumber(reach)}</b></span>
+                <span>Views <b>${formatMetricNumber(views)}</b></span>
+                <span>Engagement <b>${formatMetricNumber(engagement)}</b></span>
+                ${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Mở bài đăng ↗</a>` : '<em>Chưa có liên kết bài</em>'}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('')}
+    </div>
+  `;
+  target.querySelector('.heatmap-detail-close').addEventListener('click', () => target.classList.add('is-hidden'));
+  target.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
 function renderPostingHeatmap(items){
   const target = $('postingHeatmap');
   if(!target) return;
@@ -2632,7 +2692,7 @@ function renderPostingHeatmap(items){
   if($('heatmapInsight')){
     if(best){
       const [slot, day] = best.key.split('|').map(Number);
-      $('heatmapInsight').innerHTML = `<b>Khung giờ hiệu quả nhất:</b> ${days[day]} lúc ${String(slot).padStart(2,'0')}:00 · Trung bình ${formatMetricNumber(best.average)} ${escapeHtml(metricLabel)}/bài · ${best.count} bài`;
+      $('heatmapInsight').innerHTML = `<button type="button" class="heatmap-insight-button" data-heatmap-key="${best.key}"><b>Khung giờ hiệu quả nhất:</b> ${days[day]} lúc ${String(slot).padStart(2,'0')}:00 · Trung bình ${formatMetricNumber(best.average)} ${escapeHtml(metricLabel)}/bài · ${best.count} bài <span>Xem các bài →</span></button>`;
     }else{
       $('heatmapInsight').innerHTML = '<b>Chưa đủ dữ liệu:</b> cần có giờ đăng và KPI của bài.';
     }
@@ -2652,11 +2712,25 @@ function renderPostingHeatmap(items){
       const avgViews = group.length ? group.reduce((sum, post) => sum + heatmapMetricValue(post, 'Lượt xem'), 0) / group.length : 0;
       const avgEngagement = group.length ? group.reduce((sum, post) => sum + getPostPerformanceValue(post, '__engagement__'), 0) / group.length : 0;
       const title = `${dayName} · ${String(slot).padStart(2,'0')}:00\nSố bài: ${group.length}\nReach TB: ${formatMetricNumber(avgReach)}\nView TB: ${formatMetricNumber(avgViews)}\nEngagement TB: ${formatMetricNumber(avgEngagement)}`;
-      return `<div class="heatmap-cell heat-${level}" title="${escapeHtml(title)}"><b>${group.length ? formatMetricNumber(average) : '–'}</b><span>${group.length ? `${escapeHtml(metricLabel)} TB · ${group.length} bài` : '0 bài'}</span></div>`;
+      return `<button type="button" class="heatmap-cell heat-${level}" data-heatmap-key="${slot}|${day}" ${group.length ? '' : 'disabled'} title="${escapeHtml(title)}" aria-label="${escapeHtml(title.replace(/\n/g, '. '))}"><b>${group.length ? formatMetricNumber(average) : '–'}</b><span>${group.length ? `${escapeHtml(metricLabel)} TB · ${group.length} bài` : '0 bài'}</span></button>`;
     }).join('');
     return label + row;
   }).join('');
   target.innerHTML = `<div class="heatmap-grid">${header}${body}</div>`;
+  const openCell = key => {
+    const group = cells.get(key) || [];
+    if(!group.length) return;
+    const [slot, day] = key.split('|').map(Number);
+    target.querySelectorAll('.heatmap-cell').forEach(cell => cell.classList.toggle('is-selected', cell.dataset.heatmapKey === key));
+    renderHeatmapPostDetails(group, days[day], slot, metric, metricLabel);
+  };
+  target.querySelectorAll('[data-heatmap-key]').forEach(cell => {
+    cell.addEventListener('click', () => openCell(cell.dataset.heatmapKey));
+  });
+  const insightButton = $('heatmapInsight') ? $('heatmapInsight').querySelector('[data-heatmap-key]') : null;
+  if(insightButton) insightButton.addEventListener('click', () => openCell(insightButton.dataset.heatmapKey));
+  const details = $('heatmapPostDetails');
+  if(details) details.classList.add('is-hidden');
 }
 
 function loadReadNotificationIds(){
