@@ -1011,7 +1011,6 @@ function getShowroomCommunicationTotals(showroom, month){
     posts:items.length,
     reach,
     engagement,
-    engagementRate:reach ? engagement / reach * 100 : 0,
     follow:postFollow || monthly.follow,
     like:postLike || monthly.like,
     views:sumPostAliases(items, ['Lượt xem','Views']),
@@ -1062,7 +1061,6 @@ function renderShowroomAnalysisDashboard(){
         <div class="showroom-communication-kpis">
           <div><span>Reach</span><b>${formatMetricNumber(row.reach)}</b></div>
           <div><span>Engagement</span><b>${formatMetricNumber(row.engagement)}</b></div>
-          <div><span>Engagement rate</span><b>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</b></div>
           <div><span>Followers tăng</span><b>${formatMetricNumber(row.follow)}</b></div>
         </div>
         <p><span>Top bài:</span> ${escapeHtml(row.topPost ? row.topPost.title || 'Bài đăng không tiêu đề' : 'Chưa có dữ liệu')}</p>
@@ -1071,8 +1069,8 @@ function renderShowroomAnalysisDashboard(){
     <div class="platform-comparison showroom-comparison">
       <h4>So sánh hiệu quả truyền thông showroom</h4>
       <div class="platform-table-wrap"><table>
-        <thead><tr><th>Showroom</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Followers tăng</th><th>Số bài</th></tr></thead>
-        <tbody>${rows.map(row => `<tr><td><b>${escapeHtml(row.showroom)}</b></td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${formatMetricNumber(row.follow)}</td><td>${row.posts}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>Showroom</th><th>Reach</th><th>Engagement</th><th>Followers tăng</th><th>Số bài</th></tr></thead>
+        <tbody>${rows.map(row => `<tr><td><b>${escapeHtml(row.showroom)}</b></td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${formatMetricNumber(row.follow)}</td><td>${row.posts}</td></tr>`).join('')}</tbody>
       </table></div>
     </div>`;
 }
@@ -3767,7 +3765,7 @@ function exportPdfReport(){
     return;
   }
   reportWindow.opener = null;
-  const unitRows = units.map(row => `<tr><td>${escapeHtml(showroomDisplayName(row.showroom))}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
+  const unitRows = units.map(row => `<tr><td>${escapeHtml(showroomDisplayName(row.showroom))}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.posts}</td></tr>`).join('');
   const platformTable = platformRows.map(row => `<tr><td>${row.platform}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.rate ? row.rate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
   const topRows = topPosts.map((item,index) => `<tr><td><span class="rank">${index+1}</span></td><td><b>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</b></td><td>${escapeHtml(item.post.platform || '-')}</td><td>${escapeHtml(item.post.showroom || '-')}</td><td><b>${formatMetricNumber(item.value)}</b></td></tr>`).join('');
   const postRows = source.slice(0, 100).map((post,index) => `<tr><td>${index+1}</td><td>${formatDate(post.post_date)}</td><td>${escapeHtml(post.platform || '-')}</td><td>${escapeHtml(post.showroom || '-')}</td><td>${escapeHtml(post.title || '-')}</td></tr>`).join('');
@@ -3811,7 +3809,7 @@ function exportPdfReport(){
     <div class="content">
       <section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>
       <section class="section"><div class="section-head"><div><h2>Executive Overview</h2><p>So sánh Reach theo đơn vị và nền tảng</p></div><span class="section-tag">Power BI View</span></div><div class="dashboard-grid"><div class="chart-card"><h3>Reach theo đơn vị</h3>${unitChart}</div><div class="chart-card"><h3>Reach theo nền tảng</h3>${platformChart}</div></div></section>
-      <section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết 6 đơn vị</p></div><span class="section-tag">6 đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>
+      <section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết 6 đơn vị</p></div><span class="section-tag">6 đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>
       <section class="section"><div class="section-head"><div><h2>Platform Performance</h2><p>Hiệu quả theo kênh truyền thông</p></div><span class="section-tag">Channel mix</span></div><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table></section>
       <section class="section"><div class="section-head"><div><h2>Top Performing Posts</h2><p>5 bài đăng nổi bật nhất trong kỳ</p></div><span class="section-tag">Top 5</span></div><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table></section>
       <section class="section page-break"><div class="section-head"><div><h2>Post Details</h2><p>Danh sách bài đăng thuộc kỳ báo cáo</p></div><span class="section-tag">${source.length} bài</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table></section>
