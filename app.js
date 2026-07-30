@@ -2590,6 +2590,7 @@ function heatmapMetricValue(post, metric){
 }
 
 function heatmapSlot(postTime){
+  if(!String(postTime || '').trim()) return null;
   const hour = Number(String(postTime || '').slice(0,2));
   if(!Number.isFinite(hour)) return null;
   const slots = [6, 9, 12, 15, 18, 21];
@@ -2608,6 +2609,7 @@ function renderPostingHeatmap(items){
   const metric = $('heatmapMetric') ? $('heatmapMetric').value : 'Số người tiếp cận';
   const days = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
   const slots = [6, 9, 12, 15, 18, 21];
+  const metricLabel = metric === '__engagement__' ? 'Engagement' : metric;
   const cells = new Map();
   slots.forEach(slot => days.forEach((_day, day) => cells.set(`${slot}|${day}`, [])));
   items.forEach(post => {
@@ -2620,6 +2622,24 @@ function renderPostingHeatmap(items){
     ? group.reduce((sum, post) => sum + heatmapMetricValue(post, metric), 0) / group.length
     : 0);
   const max = Math.max(...averages, 1);
+  const excluded = items.filter(post => heatmapSlot(post.post_time) === null).length;
+  let best = null;
+  cells.forEach((group, key) => {
+    if(!group.length) return;
+    const average = group.reduce((sum, post) => sum + heatmapMetricValue(post, metric), 0) / group.length;
+    if(!best || average > best.average) best = { key, average, count:group.length };
+  });
+  if($('heatmapInsight')){
+    if(best){
+      const [slot, day] = best.key.split('|').map(Number);
+      $('heatmapInsight').innerHTML = `<b>Khung giờ hiệu quả nhất:</b> ${days[day]} lúc ${String(slot).padStart(2,'0')}:00 · Trung bình ${formatMetricNumber(best.average)} ${escapeHtml(metricLabel)}/bài · ${best.count} bài`;
+    }else{
+      $('heatmapInsight').innerHTML = '<b>Chưa đủ dữ liệu:</b> cần có giờ đăng và KPI của bài.';
+    }
+  }
+  if($('heatmapMethod')){
+    $('heatmapMethod').innerText = `Cách đọc: số lớn là ${metricLabel} trung bình trên mỗi bài. Màu so tương đối với ô tốt nhất trong kỳ: thấp <25%, trung bình 25–49%, cao 50–74%, rất cao ≥75%. ${excluded ? `${excluded} bài chưa có giờ đăng nên chưa được tính.` : ''}`;
+  }
   const header = `<div class="heatmap-corner">Giờ</div>${days.map(day => `<div class="heatmap-day">${day}</div>`).join('')}`;
   const body = slots.map(slot => {
     const label = `<div class="heatmap-time">${String(slot).padStart(2,'0')}:00</div>`;
@@ -2632,7 +2652,7 @@ function renderPostingHeatmap(items){
       const avgViews = group.length ? group.reduce((sum, post) => sum + heatmapMetricValue(post, 'Lượt xem'), 0) / group.length : 0;
       const avgEngagement = group.length ? group.reduce((sum, post) => sum + getPostPerformanceValue(post, '__engagement__'), 0) / group.length : 0;
       const title = `${dayName} · ${String(slot).padStart(2,'0')}:00\nSố bài: ${group.length}\nReach TB: ${formatMetricNumber(avgReach)}\nView TB: ${formatMetricNumber(avgViews)}\nEngagement TB: ${formatMetricNumber(avgEngagement)}`;
-      return `<div class="heatmap-cell heat-${level}" title="${escapeHtml(title)}"><b>${group.length ? formatMetricNumber(average) : '–'}</b><span>${group.length} bài</span></div>`;
+      return `<div class="heatmap-cell heat-${level}" title="${escapeHtml(title)}"><b>${group.length ? formatMetricNumber(average) : '–'}</b><span>${group.length ? `${escapeHtml(metricLabel)} TB · ${group.length} bài` : '0 bài'}</span></div>`;
     }).join('');
     return label + row;
   }).join('');
@@ -3130,6 +3150,12 @@ function parseMetaPostDate(value){
   return `${match[3]}-${String(match[1]).padStart(2,'0')}-${String(match[2]).padStart(2,'0')}`;
 }
 
+function parseMetaPostTime(value){
+  const match = String(value || '').match(/\s(\d{1,2}):(\d{2})/);
+  if(!match) return '';
+  return `${String(match[1]).padStart(2,'0')}:${match[2]}`;
+}
+
 function metaTitle(value){
   return String(value || '').split(/\r?\n/).map(line => line.trim()).find(Boolean) || 'Bài đăng từ Meta';
 }
@@ -3200,6 +3226,7 @@ async function handleMetaCsvFile(event){
       source:row,
       title:metaTitle(row['Tiêu đề']),
       postDate:parseMetaPostDate(row['Thời gian đăng']),
+      postTime:parseMetaPostTime(row['Thời gian đăng']),
       showroom:inferMetaShowroom(row),
       metrics:metaMetrics(row),
       match:findMetaPostMatch(row)
@@ -3237,9 +3264,9 @@ async function saveImportedMetaItem(item, createMissing){
   const metaId = String(item.source['ID bài viết'] || '');
   const permalink = item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : '');
   if(item.match){
-    let { error } = await supabaseClient.from('posts').update({ performance_metrics:item.metrics, post_link:permalink }).eq('id', item.match.id);
+    let { error } = await supabaseClient.from('posts').update({ performance_metrics:item.metrics, post_link:permalink, post_time:item.postTime || null }).eq('id', item.match.id);
     if(error && isMissingPerformanceMetricsColumn(error)){
-      ({ error } = await supabaseClient.from('posts').update({ post_link:permalink }).eq('id', item.match.id));
+      ({ error } = await supabaseClient.from('posts').update({ post_link:permalink, post_time:item.postTime || null }).eq('id', item.match.id));
     }
     if(error) throw error;
     await saveFallbackPostMetrics({ ...item.match, post_link:permalink }, item.metrics);
@@ -3247,7 +3274,7 @@ async function saveImportedMetaItem(item, createMissing){
   }
   if(!createMissing) return 'skipped';
   const payload = {
-    platform:metaImportContext.platform, showroom:metaImportContext.showroom || item.showroom, title:item.title, post_date:item.postDate || null,
+    platform:metaImportContext.platform, showroom:metaImportContext.showroom || item.showroom, title:item.title, post_date:item.postDate || null, post_time:item.postTime || null,
     status:'Đã đăng', note:item.source['Tiêu đề'] || '', post_link:permalink,
     image_url:'', image_urls:[], media_urls:[], thumbnail_url:'', performance_metrics:item.metrics
   };
@@ -3280,7 +3307,7 @@ async function importMetaRows(){
       await Promise.all(chunk.map(async item => {
         const metaId = String(item.source['ID bài viết'] || '');
         const permalink = item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : '');
-        const { error } = await supabaseClient.from('posts').update({ post_link:permalink }).eq('id', item.match.id);
+        const { error } = await supabaseClient.from('posts').update({ post_link:permalink, post_time:item.postTime || null }).eq('id', item.match.id);
         if(error) throw error;
       }));
       totals.updated += chunk.length;
@@ -3294,6 +3321,7 @@ async function importMetaRows(){
         showroom:metaImportContext.showroom || item.showroom,
         title:item.title,
         post_date:item.postDate || null,
+        post_time:item.postTime || null,
         status:'Đã đăng',
         note:item.source['Tiêu đề'] || '',
         post_link:item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : ''),

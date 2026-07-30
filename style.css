@@ -4189,6 +4189,17 @@ tbody tr:hover {
 .heatmap-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; color: #94a3b8; font-size: 11px; }
 .heatmap-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .heatmap-legend i { width: 12px; height: 12px; border-radius: 3px; }
+.heatmap-insight {
+  margin: 8px 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(34,211,238,.24);
+  border-radius: 10px;
+  background: rgba(34,211,238,.08);
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.heatmap-insight b { color: #67e8f9; }
+.heatmap-method { margin: 7px 0 12px; color: #94a3b8; font-size: 10px; line-height: 1.5; }
 .posting-heatmap { overflow-x: auto; }
 .heatmap-grid {
   display: grid;
