@@ -1323,17 +1323,6 @@ function renderShowroomDashboard(){
         <label>${linkLabel}
           <input type="url" placeholder="Dán ${escapeHtml(linkLabel.toLowerCase())}" value="${escapeHtml(linkValue)}" data-dashboard-link-platform="${escapeHtml(platform)}" data-dashboard-link-showroom="${escapeHtml(currentShowroom)}">
         </label>
-        <div class="kpi-input-grid">
-          <div class="monthly-kpi-heading">
-            <b>KPI theo tháng</b>
-            <span>${month ? `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}` : 'Vui lòng chọn tháng'}</span>
-          </div>
-          <label>${isWebsite ? 'Lượt xem trang' : 'Reach'}<input type="number" min="0" value="${monthlyKpi.reach}" data-kpi-field="reach" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>${isWebsite ? 'Phiên truy cập' : 'Engagement'}<input type="number" min="0" value="${monthlyKpi.engagement}" data-kpi-field="engagement" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>${isWebsite ? 'Người dùng' : 'Follow'}<input type="number" min="0" value="${monthlyKpi.follow}" data-kpi-field="follow" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-          <label>${isWebsite ? 'Lead/Form' : 'Like'}<input type="number" min="0" value="${monthlyKpi.like}" data-kpi-field="like" data-kpi-platform="${escapeHtml(platform)}" data-kpi-showroom="${escapeHtml(currentShowroom)}"></label>
-        </div>
-        ${isWebsite ? '<p class="website-kpi-note">Gợi ý báo cáo: lượt xem trang, phiên truy cập, người dùng và lead/form nhận được trong tháng.</p>' : ''}
         <a class="open-link ${linkValue ? '' : 'is-disabled'}" href="${escapeHtml(linkValue || '#')}" target="_blank" rel="noopener">${openLabel}</a>
       </article>
     `;
@@ -1371,9 +1360,6 @@ function renderShowroomDashboard(){
   });
   document.querySelectorAll('[data-dashboard-link-platform]').forEach(input => {
     input.addEventListener('change', handleShowroomDashboardLink);
-  });
-  document.querySelectorAll('[data-kpi-field]').forEach(input => {
-    input.addEventListener('change', handleMonthlyKpiInput);
   });
 }
 
