@@ -289,25 +289,29 @@ function bindEvents(){
   });
   setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', event => {
+      event.preventDefault();
       closeMediaLibraryView();
-      document.querySelectorAll('.nav').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      setActiveShowroomNav('all');
       currentPlatform = btn.dataset.platform;
       currentShowroom = 'all';
+      setActivePlatformNav(currentPlatform);
+      setActiveShowroomNav(currentShowroom);
       renderPosts();
+      setActivePlatformNav(currentPlatform);
+      setActiveShowroomNav(currentShowroom);
     });
   });
   document.querySelectorAll('.showroom-nav').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', event => {
+      event.preventDefault();
       closeMediaLibraryView();
-      document.querySelectorAll('.showroom-nav').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      setActivePlatformNav('all');
       currentShowroom = btn.dataset.showroom;
       currentPlatform = 'all';
+      setActiveShowroomNav(currentShowroom);
+      setActivePlatformNav(currentPlatform);
       renderPosts();
+      setActiveShowroomNav(currentShowroom);
+      setActivePlatformNav(currentPlatform);
     });
   });
 }
