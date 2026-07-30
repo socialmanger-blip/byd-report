@@ -274,28 +274,19 @@ function bindEvents(){
   $('imageInput').addEventListener('change', previewImages);
   document.querySelectorAll('[data-bi-view]').forEach(button => {
     button.addEventListener('click', () => {
-      setBiView(button.dataset.biView);
+      const view = button.dataset.biView;
+      if(view === 'overview' || view === 'monthly'){
+        currentPlatform = 'all';
+        currentShowroom = 'all';
+      }else if(view === 'platform'){
+        currentShowroom = 'all';
+      }else if(view === 'showroom'){
+        currentPlatform = 'all';
+      }
+      setBiView(view);
       renderPosts();
     });
   });
-  if($('biPlatformFilter')){
-    $('biPlatformFilter').addEventListener('change', event => {
-      currentPlatform = event.target.value;
-      currentShowroom = 'all';
-      setActivePlatformNav(currentPlatform);
-      setActiveShowroomNav('all');
-      renderPosts();
-    });
-  }
-  if($('biShowroomFilter')){
-    $('biShowroomFilter').addEventListener('change', event => {
-      currentShowroom = event.target.value;
-      currentPlatform = 'all';
-      setActiveShowroomNav(currentShowroom);
-      setActivePlatformNav('all');
-      renderPosts();
-    });
-  }
   setupMediaDropZone();
   document.querySelectorAll('.nav').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -338,18 +329,6 @@ function setBiView(view = 'overview'){
   document.querySelectorAll('[data-view-context]').forEach(control => {
     control.classList.toggle('is-active', control.dataset.viewContext === view);
   });
-  if(view === 'overview' || view === 'monthly'){
-    currentPlatform = 'all';
-    currentShowroom = 'all';
-  }else if(view === 'platform'){
-    currentShowroom = 'all';
-    currentPlatform = $('biPlatformFilter') ? $('biPlatformFilter').value : 'all';
-  }else if(view === 'showroom'){
-    currentPlatform = 'all';
-    currentShowroom = $('biShowroomFilter') ? $('biShowroomFilter').value : 'all';
-  }
-  if($('biPlatformFilter')) $('biPlatformFilter').value = view === 'platform' ? currentPlatform : 'all';
-  if($('biShowroomFilter')) $('biShowroomFilter').value = view === 'showroom' ? currentShowroom : 'all';
   setActivePlatformNav(currentPlatform);
   setActiveShowroomNav(currentShowroom);
 }
@@ -928,7 +907,7 @@ function renderPlatformPerformanceDashboard(){
     const engagement = totalEngagementForPosts(item.posts);
     return { ...item, reach, engagement };
   });
-  const selectedPlatform = $('biPlatformFilter') ? $('biPlatformFilter').value : 'all';
+  const selectedPlatform = currentPlatform;
   const visibleDefinitions = selectedPlatform === 'all'
     ? definitions
     : definitions.filter(item => item.name === selectedPlatform);

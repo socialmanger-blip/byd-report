@@ -3382,6 +3382,7 @@ textarea:focus {
 }
 
 .bi-dashboard:not(.view-overview) [data-overview-only] { display: none !important; }
+.bi-dashboard.view-showroom .bi-view-context { display: none; }
 .bi-dashboard.view-platform .filter-status,
 .bi-dashboard.view-platform .filter-sort,
 .bi-dashboard.view-showroom .filter-status,

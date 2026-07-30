@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260730-17" />
+  <link rel="stylesheet" href="style.css?v=20260730-18" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -85,29 +85,10 @@
             <b>Tổng quan toàn hệ thống</b>
             <span>Tổng hợp hiệu quả từ tất cả nền tảng và showroom</span>
           </div>
-          <label class="bi-view-selector" data-view-context="platform">
-            <span>Phân tích nền tảng</span>
-            <select id="biPlatformFilter">
-              <option value="all">Tất cả nền tảng</option>
-              <option value="Facebook">Facebook</option>
-              <option value="TikTok">TikTok</option>
-              <option value="Website">Website</option>
-              <option value="Zalo OA">Zalo OA</option>
-              <option value="YouTube">YouTube</option>
-              <option value="Google Maps">Google Maps</option>
-            </select>
-          </label>
-          <label class="bi-view-selector" data-view-context="showroom">
-            <span>Phân tích showroom</span>
-            <select id="biShowroomFilter">
-              <option value="all">Tất cả 5 showroom</option>
-              <option value="Phú Quốc">Phú Quốc</option>
-              <option value="Cần Thơ">Cần Thơ</option>
-              <option value="Tiền Giang">Tiền Giang</option>
-              <option value="An Giang">An Giang</option>
-              <option value="Kiên Giang">Kiên Giang</option>
-            </select>
-          </label>
+          <div class="bi-view-context-copy" data-view-context="platform">
+            <b>Hiệu quả theo nền tảng</b>
+            <span>Chọn nền tảng tại danh sách bên trái để xem và nhập dữ liệu</span>
+          </div>
           <div class="bi-view-context-copy" data-view-context="monthly">
             <b>Xu hướng theo tháng</b>
             <span>Chọn tháng ở bộ lọc bên trái để xem và so sánh với tháng trước</span>
@@ -562,6 +543,6 @@
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260730-17"></script>
+  <script src="app.js?v=20260730-18"></script>
 </body>
 </html>
