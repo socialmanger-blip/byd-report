@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260728-9" />
+  <link rel="stylesheet" href="style.css?v=20260730-11" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -63,6 +63,7 @@
           <button class="primary" id="btnOpenModal">+ Tạo bài mới</button>
         </div>
         <div class="user-box">
+          <button type="button" class="notification-button" id="btnNotifications" aria-label="Thông báo">🔔<span id="notificationBadge">0</span></button>
           <span id="currentUserEmail">-</span>
           <button id="btnLogout" type="button">Đăng xuất</button>
         </div>
@@ -145,6 +146,27 @@
             </section>
 
             <section class="report-grid">
+              <div class="report-panel heatmap-panel" data-bi-panel="overview platform showroom monthly">
+                <div class="panel-head heatmap-toolbar">
+                  <div>
+                    <h4>Hiệu quả khung giờ đăng bài</h4>
+                    <small>Giá trị trung bình theo ngày và giờ đăng</small>
+                  </div>
+                  <select id="heatmapMetric" class="chart-type-select">
+                    <option value="Số người tiếp cận">Reach</option>
+                    <option value="Lượt xem">Views</option>
+                    <option value="__engagement__">Engagement</option>
+                    <option value="Thời gian xem">Watch Time</option>
+                  </select>
+                </div>
+                <div class="heatmap-legend">
+                  <span><i class="heat-low"></i>Thấp</span>
+                  <span><i class="heat-medium"></i>Trung bình</span>
+                  <span><i class="heat-high"></i>Cao</span>
+                  <span><i class="heat-very-high"></i>Rất cao</span>
+                </div>
+                <div id="postingHeatmap" class="posting-heatmap"></div>
+              </div>
               <div class="report-panel panel-trend performance-summary-panel" data-bi-panel="overview platform showroom monthly">
                 <div class="panel-head">
                   <div>
@@ -447,6 +469,16 @@
     </div>
   </div>
 
+  <div class="notification-overlay" id="notificationOverlay"></div>
+  <aside class="notification-center" id="notificationCenter">
+    <div class="notification-head">
+      <div><h3>Action Center</h3><span id="notificationUnreadText">0 chưa đọc</span></div>
+      <button type="button" id="btnCloseNotifications">×</button>
+    </div>
+    <button type="button" class="mark-all-read" id="btnMarkAllRead">Đánh dấu tất cả đã đọc</button>
+    <div id="notificationGroups" class="notification-groups"></div>
+  </aside>
+
   <div class="image-modal" id="imageModal">
     <button class="close-img" id="btnCloseImage">×</button>
     <img id="bigImage" />
@@ -484,7 +516,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260728-9"></script>
-  <script src="app.js?v=20260728-9"></script>
+  <script src="supabase.js?v=20260730-11"></script>
+  <script src="app.js?v=20260730-11"></script>
 </body>
 </html>

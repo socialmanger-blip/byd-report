@@ -11,6 +11,7 @@ let periodPickerDisplayYear = new Date().getFullYear();
 let cloudPostMetricsFallback = {};
 let metaImportRows = [];
 let metaImportContext = { platform:'Facebook', showroom:null };
+let dashboardNotifications = [];
 
 const googleMapStorageKey = 'socialhub_google_map_showrooms_v1';
 const channelAccountStorageKey = 'socialhub_channel_accounts_v1';
@@ -18,6 +19,7 @@ const monthlyKpiStorageKey = 'socialhub_monthly_kpis_v1';
 const mediaLibraryStorageKey = 'socialhub_media_library_v1';
 const photoSopGuideStorageKey = 'socialhub_photo_sop_guide_v1';
 const fallbackPostMetricsStorageKey = 'socialhub_post_metrics_fallback_v1';
+const notificationReadStorageKey = 'socialhub_notification_read_v1';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
@@ -207,6 +209,10 @@ async function startApp(session){
 }
 
 function bindEvents(){
+  bindClick('btnNotifications', openNotificationCenter);
+  bindClick('btnCloseNotifications', closeNotificationCenter);
+  bindClick('notificationOverlay', closeNotificationCenter);
+  bindClick('btnMarkAllRead', markAllNotificationsRead);
   bindClick('btnOpenModal', () => openModal());
   bindClick('btnCloseModal', closeModal);
   bindClick('btnCancel', closeModal);
@@ -561,12 +567,13 @@ async function loadPosts(){
     return;
   }
   await loadCloudPostMetricsFallback();
-  posts = (data || []).map(post => ({
-    ...post,
-    performance_metrics: Object.keys(normalizePerformanceMetrics(post.performance_metrics)).length
-      ? post.performance_metrics
-      : getFallbackPostMetrics(post)
-  }));
+  posts = (data || []).map(post => {
+    const fallbackMetrics = getFallbackPostMetrics(post);
+    return {
+      ...post,
+      performance_metrics:Object.keys(fallbackMetrics).length ? fallbackMetrics : post.performance_metrics
+    };
+  });
   updateYearFilter();
   setStatus('Đã kết nối Supabase. Dữ liệu đang lưu online.', true);
   renderPosts();
@@ -722,6 +729,39 @@ async function saveFallbackPostMetrics(post, metrics){
     uploaded_at: new Date().toISOString()
   });
   if(error) throw error;
+}
+
+async function saveFallbackPostMetricsBatch(entries){
+  if(!entries.length) return;
+  const saved = loadFallbackPostMetrics();
+  const unique = new Map();
+  entries.forEach(({ post, metrics }) => {
+    const key = postMetricsFallbackKey(post);
+    saved[key] = metrics;
+    cloudPostMetricsFallback[key] = metrics;
+    unique.set(key, metrics);
+  });
+  localStorage.setItem(fallbackPostMetricsStorageKey, JSON.stringify(saved));
+  const keys = [...unique.keys()];
+  for(let index = 0; index < keys.length; index += 50){
+    const chunkKeys = keys.slice(index, index + 50);
+    const { error: deleteError } = await supabaseClient
+      .from('media_library')
+      .delete()
+      .eq('type', 'post_metrics')
+      .in('folder', chunkKeys);
+    if(deleteError) throw deleteError;
+    const rows = chunkKeys.map(key => ({
+      name:JSON.stringify(unique.get(key)),
+      folder:key,
+      url:'#post-metrics',
+      type:'post_metrics',
+      size:0,
+      uploaded_at:new Date().toISOString()
+    }));
+    const { error } = await supabaseClient.from('media_library').insert(rows);
+    if(error) throw error;
+  }
 }
 
 function isMissingPerformanceMetricsColumn(error){
@@ -2544,11 +2584,158 @@ function getChartType(targetId, fallback){
   return select ? select.value : fallback;
 }
 
+function heatmapMetricValue(post, metric){
+  if(metric === '__engagement__') return getPostPerformanceValue(post, '__engagement__');
+  return toNumber(normalizePerformanceMetrics(post.performance_metrics)[metric]);
+}
+
+function heatmapSlot(postTime){
+  const hour = Number(String(postTime || '').slice(0,2));
+  if(!Number.isFinite(hour)) return null;
+  const slots = [6, 9, 12, 15, 18, 21];
+  return slots.reduce((best, slot) => Math.abs(slot - hour) < Math.abs(best - hour) ? slot : best, slots[0]);
+}
+
+function heatmapDayIndex(dateText){
+  const date = new Date(`${dateText}T00:00:00`);
+  if(Number.isNaN(date.getTime())) return null;
+  return (date.getDay() + 6) % 7;
+}
+
+function renderPostingHeatmap(items){
+  const target = $('postingHeatmap');
+  if(!target) return;
+  const metric = $('heatmapMetric') ? $('heatmapMetric').value : 'Số người tiếp cận';
+  const days = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
+  const slots = [6, 9, 12, 15, 18, 21];
+  const cells = new Map();
+  slots.forEach(slot => days.forEach((_day, day) => cells.set(`${slot}|${day}`, [])));
+  items.forEach(post => {
+    const slot = heatmapSlot(post.post_time);
+    const day = heatmapDayIndex(post.post_date);
+    if(slot === null || day === null) return;
+    cells.get(`${slot}|${day}`).push(post);
+  });
+  const averages = [...cells.values()].map(group => group.length
+    ? group.reduce((sum, post) => sum + heatmapMetricValue(post, metric), 0) / group.length
+    : 0);
+  const max = Math.max(...averages, 1);
+  const header = `<div class="heatmap-corner">Giờ</div>${days.map(day => `<div class="heatmap-day">${day}</div>`).join('')}`;
+  const body = slots.map(slot => {
+    const label = `<div class="heatmap-time">${String(slot).padStart(2,'0')}:00</div>`;
+    const row = days.map((dayName, day) => {
+      const group = cells.get(`${slot}|${day}`);
+      const average = group.length ? group.reduce((sum, post) => sum + heatmapMetricValue(post, metric), 0) / group.length : 0;
+      const ratio = average / max;
+      const level = !group.length || ratio < .25 ? 'low' : ratio < .5 ? 'medium' : ratio < .75 ? 'high' : 'very-high';
+      const avgReach = group.length ? group.reduce((sum, post) => sum + heatmapMetricValue(post, 'Số người tiếp cận'), 0) / group.length : 0;
+      const avgViews = group.length ? group.reduce((sum, post) => sum + heatmapMetricValue(post, 'Lượt xem'), 0) / group.length : 0;
+      const avgEngagement = group.length ? group.reduce((sum, post) => sum + getPostPerformanceValue(post, '__engagement__'), 0) / group.length : 0;
+      const title = `${dayName} · ${String(slot).padStart(2,'0')}:00\nSố bài: ${group.length}\nReach TB: ${formatMetricNumber(avgReach)}\nView TB: ${formatMetricNumber(avgViews)}\nEngagement TB: ${formatMetricNumber(avgEngagement)}`;
+      return `<div class="heatmap-cell heat-${level}" title="${escapeHtml(title)}"><b>${group.length ? formatMetricNumber(average) : '–'}</b><span>${group.length} bài</span></div>`;
+    }).join('');
+    return label + row;
+  }).join('');
+  target.innerHTML = `<div class="heatmap-grid">${header}${body}</div>`;
+}
+
+function loadReadNotificationIds(){
+  try { return new Set(JSON.parse(localStorage.getItem(notificationReadStorageKey) || '[]')); }
+  catch(_err) { return new Set(); }
+}
+
+function saveReadNotificationIds(ids){
+  localStorage.setItem(notificationReadStorageKey, JSON.stringify([...ids]));
+}
+
+function buildDashboardNotifications(){
+  const now = new Date();
+  const month = $('monthFilter').value;
+  const scoped = getMonthPosts();
+  const notifications = [];
+  const missingMetrics = scoped.filter(post => !Object.keys(normalizePerformanceMetrics(post.performance_metrics)).length);
+  if(missingMetrics.length) notifications.push({ id:`missing-metrics-${month}-${missingMetrics.length}`, type:'action', title:`Có ${missingMetrics.length} bài chưa nhập số liệu`, detail:'Bổ sung KPI để báo cáo và Top 5 chính xác hơn.' });
+  ['Facebook','TikTok','YouTube'].forEach(platform => {
+    const latest = posts.filter(post => platformMatches(post.platform, platform) && post.post_date)
+      .sort((a,b) => String(b.post_date).localeCompare(String(a.post_date)))[0];
+    const days = latest ? Math.floor((now - new Date(`${latest.post_date}T00:00:00`)) / 86400000) : 999;
+    if(days >= 5) notifications.push({ id:`stale-${platform}-${latest ? latest.post_date : 'none'}`, type:'action', title:`${platform} ${days === 999 ? 'chưa có bài đăng' : `${days} ngày chưa đăng bài`}`, detail:'Kiểm tra lại lịch nội dung của kênh.' });
+  });
+  const selectedMonth = month || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const previous = previousMonthKey(selectedMonth);
+  const reachNow = sumMetricAliases(postsForComparisonMonth(selectedMonth), ['Số người tiếp cận']);
+  const reachBefore = sumMetricAliases(postsForComparisonMonth(previous), ['Số người tiếp cận']);
+  if(reachBefore > 0 && reachNow < reachBefore){
+    const drop = Math.round((reachBefore - reachNow) / reachBefore * 100);
+    notifications.push({ id:`reach-drop-${selectedMonth}-${drop}`, type:'warning', title:`Reach giảm ${drop}% so với tháng trước`, detail:'Xem lại tần suất đăng và nhóm nội dung hiệu quả.' });
+  }
+  posts.forEach(post => {
+    const views = heatmapMetricValue(post, 'Lượt xem');
+    if(views >= 50000) notifications.push({ id:`views-50k-${post.id}`, type:'success', title:'Video đạt trên 50.000 Views', detail:post.title || 'Bài đăng nổi bật', postId:post.id });
+  });
+  const read = loadReadNotificationIds();
+  dashboardNotifications = notifications.map(item => ({ ...item, read:read.has(item.id) }));
+}
+
+function renderNotificationCenter(){
+  buildDashboardNotifications();
+  const unread = dashboardNotifications.filter(item => !item.read).length;
+  if($('notificationBadge')){
+    $('notificationBadge').innerText = unread;
+    $('notificationBadge').classList.toggle('is-hidden', unread === 0);
+  }
+  if($('notificationUnreadText')) $('notificationUnreadText').innerText = `${unread} chưa đọc`;
+  const groups = [
+    { type:'action', title:'🔴 Cần xử lý' },
+    { type:'warning', title:'🟡 Cảnh báo' },
+    { type:'success', title:'🟢 Thành tích' }
+  ];
+  $('notificationGroups').innerHTML = groups.map(group => {
+    const items = dashboardNotifications.filter(item => item.type === group.type);
+    return `<section class="notification-group"><h4>${group.title}</h4>${items.length ? items.map(item => `
+      <button type="button" class="notification-item ${item.read ? 'is-read' : ''}" onclick="readNotification('${escapeJs(item.id)}', ${item.postId || 'null'})">
+        <b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.detail)}</span>
+      </button>`).join('') : '<div class="notification-empty">Không có thông báo</div>'}</section>`;
+  }).join('');
+}
+
+function openNotificationCenter(){
+  renderNotificationCenter();
+  $('notificationCenter').classList.add('is-open');
+  $('notificationOverlay').classList.add('is-open');
+}
+
+function closeNotificationCenter(){
+  $('notificationCenter').classList.remove('is-open');
+  $('notificationOverlay').classList.remove('is-open');
+}
+
+function readNotification(id, postId){
+  const read = loadReadNotificationIds();
+  read.add(id);
+  saveReadNotificationIds(read);
+  renderNotificationCenter();
+  if(postId){
+    closeNotificationCenter();
+    const post = posts.find(item => item.id === postId);
+    if(post) selectReportMonth(getMonthKey(post.post_date));
+  }
+}
+
+function markAllNotificationsRead(){
+  const read = loadReadNotificationIds();
+  dashboardNotifications.forEach(item => read.add(item.id));
+  saveReadNotificationIds(read);
+  renderNotificationCenter();
+}
+
 function updateStats(){
   const monthPosts = getMonthPosts();
   renderPerformanceSummary(monthPosts);
   renderTopPerformingPosts(monthPosts);
   renderMonthComparison();
+  renderPostingHeatmap(monthPosts);
+  renderNotificationCenter();
   const done = monthPosts.filter(p => p.status === 'Đã đăng').length;
   const pending = monthPosts.filter(p => p.status === 'Chờ duyệt').length;
   const idea = monthPosts.filter(p => p.status === 'Ý tưởng').length;
@@ -3079,13 +3266,58 @@ async function importMetaRows(){
   if(!metaImportRows.length) return;
   const button = $('btnRunMetaImport');
   button.disabled = true;
-  button.innerText = 'Đang nhập...';
+  button.innerText = 'Đang chuẩn bị...';
   const totals = { updated:0, created:0, skipped:0 };
   try{
-    for(const item of metaImportRows){
-      const result = await saveImportedMetaItem(item, $('metaCreateMissing').checked);
-      totals[result] += 1;
+    const createMissing = $('metaCreateMissing').checked;
+    const matchedItems = metaImportRows.filter(item => item.match);
+    const newItems = metaImportRows.filter(item => !item.match && createMissing);
+    totals.skipped = metaImportRows.length - matchedItems.length - newItems.length;
+
+    button.innerText = `Đang cập nhật 0/${matchedItems.length}...`;
+    for(let index = 0; index < matchedItems.length; index += 10){
+      const chunk = matchedItems.slice(index, index + 10);
+      await Promise.all(chunk.map(async item => {
+        const metaId = String(item.source['ID bài viết'] || '');
+        const permalink = item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : '');
+        const { error } = await supabaseClient.from('posts').update({ post_link:permalink }).eq('id', item.match.id);
+        if(error) throw error;
+      }));
+      totals.updated += chunk.length;
+      button.innerText = `Đang cập nhật ${totals.updated}/${matchedItems.length}...`;
     }
+
+    const newPayloads = newItems.map(item => {
+      const metaId = String(item.source['ID bài viết'] || '');
+      return {
+        platform:metaImportContext.platform,
+        showroom:metaImportContext.showroom || item.showroom,
+        title:item.title,
+        post_date:item.postDate || null,
+        status:'Đã đăng',
+        note:item.source['Tiêu đề'] || '',
+        post_link:item.source['Liên kết vĩnh viễn'] || (metaId ? `https://www.facebook.com/${metaId}` : ''),
+        image_url:'',
+        image_urls:[],
+        media_urls:[],
+        thumbnail_url:''
+      };
+    });
+    for(let index = 0; index < newPayloads.length; index += 50){
+      const chunk = newPayloads.slice(index, index + 50);
+      button.innerText = `Đang tạo ${totals.created}/${newPayloads.length}...`;
+      const { error } = await supabaseClient.from('posts').insert(chunk);
+      if(error) throw error;
+      totals.created += chunk.length;
+    }
+
+    button.innerText = 'Đang lưu KPI...';
+    const metricEntries = [
+      ...matchedItems.map(item => ({ post:item.match, metrics:item.metrics })),
+      ...newItems.map((item, index) => ({ post:newPayloads[index], metrics:item.metrics }))
+    ];
+    await saveFallbackPostMetricsBatch(metricEntries);
+
     closeMetaImportModal();
     await loadPosts();
     alert(`Đã nhập Meta thành công: ${totals.updated} bài cập nhật, ${totals.created} bài tạo mới, ${totals.skipped} bài bỏ qua.`);
