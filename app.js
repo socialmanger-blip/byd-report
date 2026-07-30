@@ -868,6 +868,7 @@ function renderTopPerformingPosts(items){
   }
   const max = ranked[0].value || 1;
   target.innerHTML = ranked.map((item, index) => {
+    const postLink = heatmapPostLink(item.post);
     const postMetrics = Object.entries(normalizePerformanceMetrics(item.post.performance_metrics))
       .filter(([, value]) => toNumber(value) > 0)
       .sort((a,b) => b[1] - a[1])
@@ -886,6 +887,7 @@ function renderTopPerformingPosts(items){
           <div class="top-post-bar"><i style="width:${Math.max(5, Math.round(item.value / max * 100))}%"></i></div>
           <div class="top-post-metrics">
             ${postMetrics.map(([name, value]) => `<span>${escapeHtml(name)}: <b>${formatMetricNumber(value)}</b></span>`).join('')}
+            ${postLink ? `<a class="top-post-open-link" href="${escapeHtml(postLink)}" target="_blank" rel="noopener noreferrer">Mở bài đăng ↗</a>` : '<em class="top-post-link-missing">Chưa có liên kết bài</em>'}
           </div>
         </div>
       </article>

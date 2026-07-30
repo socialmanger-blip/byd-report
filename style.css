@@ -4602,6 +4602,35 @@ tbody tr:hover {
   font-size: 10px;
 }
 .top-post-metrics b { color: #eaf6ff; }
+.top-post-open-link,
+.top-post-link-missing {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-style: normal;
+  text-decoration: none;
+}
+.top-post-open-link {
+  border: 1px solid rgba(34,211,238,.28);
+  background: rgba(34,211,238,.1);
+  color: #67e8f9;
+  font-weight: 800;
+}
+.top-post-open-link:hover { background: rgba(34,211,238,.18); }
+.top-post-link-missing { color: #64748b; }
+.google-card .review-metrics div {
+  border: 1px solid #cbd8e6;
+  background: #edf4fb;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+}
+.google-card .review-metrics b {
+  color: #0b2340;
+  font-weight: 900;
+}
+.google-card .review-metrics span {
+  color: #52657b;
+}
 .website-kpi-note {
   margin: 10px 0 0;
   color: var(--tech-muted);
