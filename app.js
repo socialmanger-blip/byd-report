@@ -3722,30 +3722,56 @@ function exportPdfReport(){
   reportWindow.opener = null;
   const unitRows = units.map(row => `<tr><td>${escapeHtml(showroomDisplayName(row.showroom))}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.reach ? row.engagementRate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
   const platformTable = platformRows.map(row => `<tr><td>${row.platform}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.rate ? row.rate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
-  const topRows = topPosts.map((item,index) => `<tr><td>${index+1}</td><td>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</td><td>${escapeHtml(item.post.platform || '-')}</td><td>${escapeHtml(item.post.showroom || '-')}</td><td>${formatMetricNumber(item.value)}</td></tr>`).join('');
+  const topRows = topPosts.map((item,index) => `<tr><td><span class="rank">${index+1}</span></td><td><b>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</b></td><td>${escapeHtml(item.post.platform || '-')}</td><td>${escapeHtml(item.post.showroom || '-')}</td><td><b>${formatMetricNumber(item.value)}</b></td></tr>`).join('');
   const postRows = source.slice(0, 100).map((post,index) => `<tr><td>${index+1}</td><td>${formatDate(post.post_date)}</td><td>${escapeHtml(post.platform || '-')}</td><td>${escapeHtml(post.showroom || '-')}</td><td>${escapeHtml(post.title || '-')}</td></tr>`).join('');
+  const maxUnitReach = Math.max(...units.map(row => row.reach), 1);
+  const maxPlatformReach = Math.max(...platformRows.map(row => row.reach), 1);
+  const unitChart = units.map((row,index) => `<div class="bar-row"><span>${escapeHtml(showroomDisplayName(row.showroom))}</span><div class="bar-track"><i style="width:${row.reach ? Math.max(3,row.reach/maxUnitReach*100) : 0}%;--bar-color:${['#22d3ee','#3b82f6','#8b5cf6','#10b981','#f59e0b','#ec4899'][index]}"></i></div><b>${formatMetricNumber(row.reach)}</b></div>`).join('');
+  const platformChart = platformRows.map((row,index) => `<div class="bar-row"><span>${row.platform}</span><div class="bar-track"><i style="width:${row.reach ? Math.max(3,row.reach/maxPlatformReach*100) : 0}%;--bar-color:${['#2563eb','#111827','#06b6d4'][index]}"></i></div><b>${formatMetricNumber(row.reach)}</b></div>`).join('');
   reportWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo truyền thông ${periodLabel}</title>
   <style>
-    @page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#172033;background:#fff;font-size:10px}
-    header{padding:18px 20px;background:linear-gradient(135deg,#071b35,#0e7490);color:#fff;border-radius:12px;margin-bottom:16px}
-    header small{letter-spacing:1.5px;text-transform:uppercase;color:#a5f3fc}header h1{margin:7px 0 4px;font-size:24px}header p{margin:0;color:#dbeafe}
-    h2{font-size:15px;margin:20px 0 8px;color:#0f3b62;border-left:4px solid #06b6d4;padding-left:8px}
-    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.summary div{padding:12px;border:1px solid #dbe5ef;border-radius:9px;background:#f7fafc}
-    .summary span{display:block;color:#64748b}.summary b{display:block;margin-top:5px;font-size:17px;color:#0f3b62}
-    table{width:100%;border-collapse:collapse;page-break-inside:auto}thead{display:table-header-group}tr{page-break-inside:avoid}
-    th{padding:8px;background:#0f3b62;color:#fff;text-align:left}td{padding:7px;border-bottom:1px solid #dbe5ef;vertical-align:top}tbody tr:nth-child(even){background:#f7fafc}
-    .note{margin-top:12px;color:#64748b;font-size:9px}.footer{margin-top:20px;padding-top:8px;border-top:1px solid #dbe5ef;color:#64748b;text-align:right}
-    @media print{.no-print{display:none}}.no-print{position:fixed;right:18px;top:18px;padding:10px 14px;border:0;border-radius:8px;background:#06b6d4;color:#062033;font-weight:bold;cursor:pointer}
+    @page{size:A4;margin:11mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    :root{--navy:#071629;--panel:#0d223d;--cyan:#22d3ee;--blue:#2563eb;--ink:#132238;--muted:#64748b;--line:#dce6f0}
+    body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--ink);background:#eef4f8;font-size:9.5px}
+    .report-page{background:#fff;min-height:275mm;padding:0}
+    header{position:relative;overflow:hidden;padding:22px 24px 19px;background:linear-gradient(125deg,#061426 0%,#0b2a4d 58%,#0e7490 100%);color:#fff;border-radius:0 0 16px 16px;margin-bottom:14px}
+    header:after{content:"";position:absolute;width:190px;height:190px;border:36px solid rgba(34,211,238,.11);border-radius:50%;right:-60px;top:-90px}
+    .brand-row{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+    .brand{display:flex;align-items:center;gap:9px}.brand-mark{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:linear-gradient(145deg,#22d3ee,#2563eb);font-weight:900}
+    header small{letter-spacing:1.5px;text-transform:uppercase;color:#a5f3fc;font-weight:700}.period-badge{padding:6px 10px;border:1px solid rgba(165,243,252,.35);border-radius:999px;background:rgba(6,20,38,.28);font-weight:700}
+    header h1{position:relative;z-index:1;margin:17px 0 5px;font-size:23px;letter-spacing:-.5px}header p{position:relative;z-index:1;margin:0;color:#cbdff4}
+    .content{padding:0 14px 14px}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    .summary div{position:relative;overflow:hidden;padding:12px;border:1px solid #dce8f2;border-radius:11px;background:linear-gradient(145deg,#fff,#f3f8fc);box-shadow:0 4px 12px rgba(15,50,80,.06)}
+    .summary div:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(#22d3ee,#2563eb)}
+    .summary span{display:block;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.4px;font-weight:700}.summary b{display:block;margin-top:6px;font-size:18px;color:#0a3158}
+    .section{margin-top:11px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:0 3px 12px rgba(15,50,80,.05);page-break-inside:avoid}
+    .section-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}.section-head h2{font-size:13px;margin:0;color:#0a3158}.section-head p{margin:3px 0 0;color:var(--muted);font-size:8px}.section-tag{padding:4px 7px;border-radius:6px;background:#e6f8fb;color:#08778b;font-size:7.5px;font-weight:800;text-transform:uppercase}
+    .dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.chart-card{padding:10px;border-radius:9px;background:#f5f9fc;border:1px solid #e2ebf3}.chart-card h3{margin:0 0 9px;font-size:9px;color:#334155}
+    .bar-row{display:grid;grid-template-columns:82px 1fr 52px;align-items:center;gap:7px;margin:7px 0}.bar-row>span{color:#475569;font-size:7.8px}.bar-row>b{text-align:right;color:#0f3b62;font-size:8px}
+    .bar-track{height:8px;border-radius:99px;background:#e1eaf2;overflow:hidden}.bar-track i{display:block;height:100%;border-radius:99px;background:var(--bar-color)}
+    table{width:100%;border-collapse:separate;border-spacing:0;page-break-inside:auto}thead{display:table-header-group}tr{page-break-inside:avoid}
+    th{padding:7px 8px;background:#0b2746;color:#dff8ff;text-align:left;font-size:7.5px;text-transform:uppercase;letter-spacing:.35px}
+    th:first-child{border-radius:7px 0 0 0}th:last-child{border-radius:0 7px 0 0}td{padding:7px 8px;border-bottom:1px solid #e5edf4;vertical-align:top;color:#334155}tbody tr:nth-child(even){background:#f6f9fc}tbody tr:last-child td{border-bottom:0}
+    .rank{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:6px;background:#dff7fb;color:#08778b;font-weight:900}
+    .page-break{break-before:page;page-break-before:always}.note{margin:12px 2px 0;color:#64748b;font-size:8px;line-height:1.5}
+    .footer{margin-top:16px;padding:9px 2px 0;border-top:1px solid #dbe5ef;color:#64748b;display:flex;justify-content:space-between}
+    @media print{body{background:#fff}.no-print{display:none}.report-page{min-height:auto}.section{box-shadow:none}}
+    .no-print{position:fixed;z-index:20;right:18px;top:18px;padding:10px 14px;border:0;border-radius:8px;background:#22d3ee;color:#062033;font-weight:bold;box-shadow:0 8px 24px rgba(6,20,38,.25);cursor:pointer}
   </style></head><body>
   <button class="no-print" onclick="window.print()">Lưu thành PDF</button>
-  <header><small>BYD NEG · Báo cáo quản trị truyền thông</small><h1>Báo cáo tổng hợp Tất cả showroom</h1><p>${periodLabel} · Trụ sở chính, Phú Quốc, Cần Thơ, An Giang, Kiên Giang, Tiền Giang</p></header>
-  <section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>
-  <h2>So sánh 6 đơn vị</h2><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table>
-  <h2>Hiệu quả theo nền tảng</h2><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table>
-  <h2>Top 5 bài đăng</h2><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table>
-  <h2>Danh sách bài đăng trong kỳ</h2><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table>
-  <p class="note">Báo cáo được tổng hợp từ dữ liệu hiện có của 6 đơn vị trong tháng được chọn. Danh sách chi tiết hiển thị tối đa 100 bài; dùng Xuất Excel để lấy toàn bộ dữ liệu.</p>
-  <div class="footer">SocialHub BYD NEG · Xuất ngày ${new Date().toLocaleDateString('vi-VN')}</div>
+  <main class="report-page">
+    <header><div class="brand-row"><div class="brand"><div class="brand-mark">B</div><div><small>BYD NEG</small><div>Marketing Intelligence</div></div></div><div class="period-badge">${periodLabel}</div></div><h1>Social Media Performance Report</h1><p>Tổng hợp hiệu quả truyền thông của Trụ sở chính và 5 showroom</p></header>
+    <div class="content">
+      <section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>
+      <section class="section"><div class="section-head"><div><h2>Executive Overview</h2><p>So sánh Reach theo đơn vị và nền tảng</p></div><span class="section-tag">Power BI View</span></div><div class="dashboard-grid"><div class="chart-card"><h3>Reach theo đơn vị</h3>${unitChart}</div><div class="chart-card"><h3>Reach theo nền tảng</h3>${platformChart}</div></div></section>
+      <section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết 6 đơn vị</p></div><span class="section-tag">6 đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>
+      <section class="section"><div class="section-head"><div><h2>Platform Performance</h2><p>Hiệu quả theo kênh truyền thông</p></div><span class="section-tag">Channel mix</span></div><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table></section>
+      <section class="section"><div class="section-head"><div><h2>Top Performing Posts</h2><p>5 bài đăng nổi bật nhất trong kỳ</p></div><span class="section-tag">Top 5</span></div><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table></section>
+      <section class="section page-break"><div class="section-head"><div><h2>Post Details</h2><p>Danh sách bài đăng thuộc kỳ báo cáo</p></div><span class="section-tag">${source.length} bài</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table></section>
+      <p class="note">Báo cáo được tổng hợp từ dữ liệu hiện có của 6 đơn vị trong tháng được chọn. Danh sách chi tiết hiển thị tối đa 100 bài; dùng Xuất Excel để lấy toàn bộ dữ liệu.</p>
+      <div class="footer"><span>SocialHub · BYD NEG</span><span>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</span></div>
+    </div>
+  </main>
   <script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
   reportWindow.document.close();
 }
