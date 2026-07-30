@@ -1002,9 +1002,6 @@ function getShowroomCommunicationTotals(showroom, month){
   const postLike = sumPostAliases(items, ['Lượt thích và cảm xúc','Like']);
   const reach = postReach || monthly.reach;
   const engagement = postEngagement || monthly.engagement;
-  const topPost = items
-    .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
-    .sort((a,b) => b.value - a.value)[0];
   return {
     showroom,
     items,
@@ -1013,8 +1010,7 @@ function getShowroomCommunicationTotals(showroom, month){
     engagement,
     follow:postFollow || monthly.follow,
     like:postLike || monthly.like,
-    views:sumPostAliases(items, ['Lượt xem','Views']),
-    topPost:topPost ? topPost.post : null
+    views:sumPostAliases(items, ['Lượt xem','Views'])
   };
 }
 
@@ -1063,7 +1059,6 @@ function renderShowroomAnalysisDashboard(){
           <div><span>Engagement</span><b>${formatMetricNumber(row.engagement)}</b></div>
           <div><span>Followers tăng</span><b>${formatMetricNumber(row.follow)}</b></div>
         </div>
-        <p><span>Top bài:</span> ${escapeHtml(row.topPost ? row.topPost.title || 'Bài đăng không tiêu đề' : 'Chưa có dữ liệu')}</p>
       </article>`).join('')}
     </div>
     <div class="platform-comparison showroom-comparison">
