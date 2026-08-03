@@ -2109,6 +2109,7 @@ async function saveMediaLibraryBackupToStorage(){
 }
 
 async function loadMediaLibraryFromSupabase(){
+  const localState = loadMediaLibrary();
   const backupState = await loadMediaLibraryBackupFromStorage();
   const { data, error } = await supabaseClient
     .from('media_library')
@@ -2116,13 +2117,13 @@ async function loadMediaLibraryFromSupabase(){
     .order('uploaded_at', { ascending:false });
   if(error){
     console.warn('Không đọc được Media Library từ Supabase:', error);
-    mediaLibrary = mergeMediaLibraryState(loadMediaLibrary(),backupState);
+    mediaLibrary = mergeMediaLibraryState(localState,backupState);
     mediaLibraryBackupReady = true;
     saveMediaLibrary();
     return;
   }
   if(!data || !data.length){
-    mediaLibrary = mergeMediaLibraryState(loadMediaLibrary(),backupState);
+    mediaLibrary = mergeMediaLibraryState(localState,backupState);
     await migrateLocalMediaLibraryToSupabase();
     mediaLibraryBackupReady = true;
     saveMediaLibrary();
@@ -2151,8 +2152,14 @@ async function loadMediaLibraryFromSupabase(){
     files
   };
   mediaLibrary = mergeMediaLibraryState(mediaLibrary,backupState);
+  mediaLibrary = mergeMediaLibraryState(mediaLibrary,localState);
   mediaLibraryBackupReady = true;
   saveMediaLibrary();
+  const folderSyncResults = await Promise.allSettled((mediaLibrary.folders || []).map(folder => saveMediaFolderToSupabase(folder)));
+  folderSyncResults.forEach(result => {
+    if(result.status === 'rejected') console.warn('Không đồng bộ được một thư mục Media Library:',result.reason);
+  });
+  await saveMediaLibraryBackupToStorage().catch(err => console.warn('Không cập nhật được bản sao Media Library sau khi hợp nhất:',err));
   if(!files.length) await recoverMediaLibraryFromStorage({ notify:false });
 }
 
