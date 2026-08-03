@@ -25,7 +25,7 @@ const notificationReadStorageKey = 'socialhub_notification_read_v1';
 const metaImportHistoryType = 'meta_import_history';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
-const mediaLibraryBackupPath = 'system/media-library-index.json';
+const mediaLibraryBackupFolder = 'system/media-library-index';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
@@ -2092,7 +2092,8 @@ function mergeMediaLibraryState(base, overlay){
 }
 
 async function loadMediaLibraryBackupFromStorage(){
-  const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).download(mediaLibraryBackupPath);
+  const backupPath = `${mediaLibraryBackupFolder}/${currentUser && currentUser.id ? currentUser.id : 'anonymous'}.json`;
+  const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).download(backupPath);
   if(error){
     if(String(error.message || '').toLowerCase().includes('not found')) return null;
     console.warn('Không đọc được bản sao Media Library:',error);
@@ -2108,9 +2109,10 @@ async function loadMediaLibraryBackupFromStorage(){
 }
 
 async function saveMediaLibraryBackupToStorage(){
+  const backupPath = `${mediaLibraryBackupFolder}/${currentUser && currentUser.id ? currentUser.id : 'anonymous'}.json`;
   const payload = JSON.stringify({ version:1, savedAt:new Date().toISOString(), mediaLibrary });
   const blob = new Blob([payload],{type:'application/json'});
-  const { error } = await supabaseClient.storage.from(BUCKET_NAME).upload(mediaLibraryBackupPath,blob,{upsert:true,contentType:'application/json'});
+  const { error } = await supabaseClient.storage.from(BUCKET_NAME).upload(backupPath,blob,{upsert:true,contentType:'application/json'});
   if(error) throw error;
 }
 
@@ -2123,13 +2125,13 @@ async function loadMediaLibraryFromSupabase(){
     .order('uploaded_at', { ascending:false });
   if(error){
     console.warn('Không đọc được Media Library từ Supabase:', error);
-    mediaLibrary = mergeMediaLibraryState(localState,backupState);
-    mediaLibraryBackupReady = true;
+    mediaLibrary = backupState || localState;
+    mediaLibraryBackupReady = false;
     saveMediaLibrary();
     return;
   }
   if(!data || !data.length){
-    mediaLibrary = mergeMediaLibraryState(localState,backupState);
+    mediaLibrary = backupState || localState;
     await migrateLocalMediaLibraryToSupabase();
     mediaLibraryBackupReady = true;
     saveMediaLibrary();
@@ -2153,18 +2155,19 @@ async function loadMediaLibraryFromSupabase(){
       size: toNumber(row.size),
       uploadedAt: row.uploaded_at || new Date().toISOString()
     }));
+  if(!folders.length && !files.length && backupState){
+    mediaLibrary = backupState;
+    await migrateLocalMediaLibraryToSupabase();
+    mediaLibraryBackupReady = true;
+    saveMediaLibrary();
+    return;
+  }
   mediaLibrary = {
     folders: normalizeMediaFolders([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)], files),
     files
   };
-  mediaLibrary = mergeMediaLibraryState(mediaLibrary,backupState);
-  mediaLibrary = mergeMediaLibraryState(mediaLibrary,localState);
   mediaLibraryBackupReady = true;
   saveMediaLibrary();
-  const folderSyncResults = await Promise.allSettled((mediaLibrary.folders || []).map(folder => saveMediaFolderToSupabase(folder)));
-  folderSyncResults.forEach(result => {
-    if(result.status === 'rejected') console.warn('Không đồng bộ được một thư mục Media Library:',result.reason);
-  });
   await saveMediaLibraryBackupToStorage().catch(err => console.warn('Không cập nhật được bản sao Media Library sau khi hợp nhất:',err));
   if(!files.length) await recoverMediaLibraryFromStorage({ notify:false });
 }
@@ -2329,19 +2332,30 @@ async function updateMediaFolderInSupabase(folder, nextFolder){
     .select('id,folder')
     .like('folder', `${folder}/%`);
   if(childError) throw childError;
-  for(const row of [...(exactRows || []), ...(childRows || [])]){
-    const renamedFolder = row.folder === folder
-      ? nextFolder
-      : `${nextFolder}${row.folder.slice(folder.length)}`;
-    const { error } = await supabaseClient
-      .from('media_library')
-      .update({ folder:renamedFolder })
-      .eq('id', row.id);
-    if(error) throw error;
+  const updatedRows = [];
+  try{
+    for(const row of [...(exactRows || []), ...(childRows || [])]){
+      const renamedFolder = row.folder === folder
+        ? nextFolder
+        : `${nextFolder}${row.folder.slice(folder.length)}`;
+      const { error } = await supabaseClient
+        .from('media_library')
+        .update({ folder:renamedFolder })
+        .eq('id', row.id);
+      if(error) throw error;
+      updatedRows.push(row);
+    }
+  }catch(err){
+    for(const row of updatedRows.reverse()){
+      await supabaseClient.from('media_library').update({folder:row.folder}).eq('id',row.id);
+    }
+    throw err;
   }
 }
 
 async function deleteMediaFolderFromSupabase(folder){
+  const files = (mediaLibrary.files || []).filter(file => file.folder === folder || file.folder.startsWith(`${folder}/`));
+  await removeMediaFilesFromStorage(files);
   const { error:childError } = await supabaseClient
     .from('media_library')
     .delete()
@@ -2349,6 +2363,14 @@ async function deleteMediaFolderFromSupabase(folder){
   if(childError) throw childError;
   const { error } = await supabaseClient.from('media_library').delete().eq('folder', folder);
   if(error) throw error;
+}
+
+async function removeMediaFilesFromStorage(files){
+  const paths = [...new Set((files || []).map(file => mediaStoragePathFromUrl(file.url)).filter(Boolean))];
+  for(let index=0; index<paths.length; index+=100){
+    const { error } = await supabaseClient.storage.from(BUCKET_NAME).remove(paths.slice(index,index+100));
+    if(error) throw error;
+  }
 }
 
 function isUuid(value){
@@ -2406,6 +2428,7 @@ async function updateMediaFileInSupabase(id, fields){
 
 async function deleteMediaFileFromSupabase(id){
   const file = mediaLibrary.files.find(item => item.id === id);
+  if(file) await removeMediaFilesFromStorage([file]);
   if(isUuid(id)){
     const { error } = await supabaseClient.from('media_library').delete().eq('id', id);
     if(error) throw error;
@@ -4163,7 +4186,7 @@ function getPdfSelectedSections(){
 
 async function exportNativeDashboardReport(){
   const month = $('pdfReportMonth').value;
-  const format = $('dashboardExportFormat').value;
+  const format = 'pdf';
   const views = Array.from(document.querySelectorAll('.dashboard-export-views input:checked')).map(input => input.value);
   if(!month){ alert('Vui lòng chọn tháng báo cáo.'); return; }
   if(!views.length){ alert('Vui lòng chọn ít nhất một trang dashboard.'); return; }
@@ -4269,7 +4292,7 @@ function nextDashboardPaint(){
 
 async function exportDashboardReport(){
   const month = $('pdfReportMonth').value;
-  const format = $('dashboardExportFormat').value;
+  const format = 'pdf';
   const views = Array.from(document.querySelectorAll('.dashboard-export-views input:checked')).map(input => input.value);
   if(!month){ alert('Vui lòng chọn tháng báo cáo.'); return; }
   if(!views.length){ alert('Vui lòng chọn ít nhất một trang dashboard.'); return; }
