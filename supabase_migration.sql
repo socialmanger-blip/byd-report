@@ -25,6 +25,13 @@ create table if not exists public.media_library (
   uploaded_at timestamptz default now()
 );
 
+create table if not exists public.media_folders (
+  id uuid primary key default gen_random_uuid(),
+  path text not null unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Link account + ảnh đại diện theo từng nền tảng/showroom.
 create table if not exists public.channel_accounts (
   id uuid primary key default gen_random_uuid(),

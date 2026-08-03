@@ -127,6 +127,7 @@ let selectedLibraryMediaUrls = [];
 let pendingPickedMedia = new Set();
 let mediaLibraryBackupReady = false;
 let mediaLibraryBackupTimer = null;
+let mediaFoldersTableAvailable = true;
 
 const defaultExportFields = [
   { key:'stt', label:'STT', checked:true },
@@ -2116,9 +2117,26 @@ async function saveMediaLibraryBackupToStorage(){
   if(error) throw error;
 }
 
+async function loadDedicatedMediaFolders(){
+  const { data, error } = await supabaseClient.from('media_folders').select('path').order('path');
+  if(error){
+    if(error.code === '42P01' || error.code === 'PGRST205'){
+      mediaFoldersTableAvailable = false;
+      return [];
+    }
+    throw error;
+  }
+  mediaFoldersTableAvailable = true;
+  return (data || []).map(row => row.path).filter(Boolean);
+}
+
 async function loadMediaLibraryFromSupabase(){
   const localState = loadMediaLibrary();
   const backupState = await loadMediaLibraryBackupFromStorage();
+  const dedicatedFolders = await loadDedicatedMediaFolders().catch(err => {
+    console.warn('Không đọc được bảng media_folders:',err);
+    return [];
+  });
   const { data, error } = await supabaseClient
     .from('media_library')
     .select('*')
@@ -2132,6 +2150,7 @@ async function loadMediaLibraryFromSupabase(){
   }
   if(!data || !data.length){
     mediaLibrary = backupState || localState;
+    mediaLibrary.folders = normalizeMediaFolders([...(mediaLibrary.folders || []),...dedicatedFolders],mediaLibrary.files || []);
     await migrateLocalMediaLibraryToSupabase();
     mediaLibraryBackupReady = true;
     saveMediaLibrary();
@@ -2141,6 +2160,7 @@ async function loadMediaLibraryFromSupabase(){
     .filter(row => row.type === 'folder')
     .map(row => row.folder)
     .filter(Boolean);
+  folders.push(...dedicatedFolders);
   const files = data
     .filter(row => row.type !== 'folder'
       && row.type !== 'photo_sop_guide'
@@ -2302,6 +2322,19 @@ async function migrateLocalMediaLibraryToSupabase(){
 
 async function saveMediaFolderToSupabase(folder){
   if(!folder) return;
+  if(mediaFoldersTableAvailable){
+    const { data:folderRow, error:folderError } = await supabaseClient
+      .from('media_folders')
+      .upsert({path:folder,updated_at:new Date().toISOString()},{onConflict:'path'})
+      .select('path')
+      .single();
+    if(folderError){
+      if(folderError.code === '42P01' || folderError.code === 'PGRST205') mediaFoldersTableAvailable = false;
+      else throw folderError;
+    }else if(!folderRow || folderRow.path !== folder){
+      throw new Error('Supabase không xác nhận folder trong bảng media_folders.');
+    }
+  }
   const { data, error:selectError } = await supabaseClient
     .from('media_library')
     .select('id')
@@ -2333,6 +2366,7 @@ async function updateMediaFolderInSupabase(folder, nextFolder){
     .like('folder', `${folder}/%`);
   if(childError) throw childError;
   const updatedRows = [];
+  const dedicatedUpdatedRows = [];
   try{
     for(const row of [...(exactRows || []), ...(childRows || [])]){
       const renamedFolder = row.folder === folder
@@ -2345,7 +2379,21 @@ async function updateMediaFolderInSupabase(folder, nextFolder){
       if(error) throw error;
       updatedRows.push(row);
     }
+    if(mediaFoldersTableAvailable){
+      const {data:allFolders,error:folderSelectError} = await supabaseClient.from('media_folders').select('id,path');
+      if(folderSelectError) throw folderSelectError;
+      const affected = (allFolders || []).filter(row => row.path === folder || row.path.startsWith(`${folder}/`));
+      for(const row of affected){
+        const nextPath = `${nextFolder}${row.path.slice(folder.length)}`;
+        const {error} = await supabaseClient.from('media_folders').update({path:nextPath,updated_at:new Date().toISOString()}).eq('id',row.id);
+        if(error) throw error;
+        dedicatedUpdatedRows.push(row);
+      }
+    }
   }catch(err){
+    for(const row of dedicatedUpdatedRows.reverse()){
+      await supabaseClient.from('media_folders').update({path:row.path,updated_at:new Date().toISOString()}).eq('id',row.id);
+    }
     for(const row of updatedRows.reverse()){
       await supabaseClient.from('media_library').update({folder:row.folder}).eq('id',row.id);
     }
@@ -2363,6 +2411,15 @@ async function deleteMediaFolderFromSupabase(folder){
   if(childError) throw childError;
   const { error } = await supabaseClient.from('media_library').delete().eq('folder', folder);
   if(error) throw error;
+  if(mediaFoldersTableAvailable){
+    const {data:folderRows,error:selectError} = await supabaseClient.from('media_folders').select('id,path');
+    if(selectError) throw selectError;
+    const ids = (folderRows || []).filter(row => row.path === folder || row.path.startsWith(`${folder}/`)).map(row => row.id);
+    if(ids.length){
+      const {error:folderDeleteError} = await supabaseClient.from('media_folders').delete().in('id',ids);
+      if(folderDeleteError) throw folderDeleteError;
+    }
+  }
 }
 
 async function removeMediaFilesFromStorage(files){
