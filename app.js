@@ -223,10 +223,7 @@ function bindEvents(){
   bindClick('btnReload', loadPosts);
   bindClick('btnOpenExport', openExportModal);
   bindClick('btnOpenExportTop', openExportModal);
-  bindClick('btnExportPdf', openPdfExportModal);
-  bindClick('btnClosePdfExport', closePdfExportModal);
-  bindClick('btnCancelPdfExport', closePdfExportModal);
-  bindClick('btnGeneratePdf', exportPdfReport);
+  bindClick('btnExportPdf', exportDashboardPdf);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -282,7 +279,6 @@ function bindEvents(){
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
-  $('pdfExportModal').addEventListener('click', (e)=>{ if(e.target.id==='pdfExportModal') closePdfExportModal(); });
   $('metaImportModal').addEventListener('click', (e)=>{ if(e.target.id==='metaImportModal') closeMetaImportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('moveMediaModal').addEventListener('click', (e)=>{ if(e.target.id==='moveMediaModal') closeMoveMediaModal(); });
@@ -1244,7 +1240,7 @@ function updateWorkspaceActions(){
   document.querySelectorAll('.top-actions').forEach(el => {
     el.classList.toggle('is-hidden', currentShowroom === 'all' || currentPlatform === 'Google Maps');
   });
-  if($('btnExportPdf')) $('btnExportPdf').classList.remove('is-hidden');
+  if($('btnExportPdf')) $('btnExportPdf').classList.toggle('is-hidden', currentShowroom !== 'all' || currentPlatform !== 'all');
 }
 
 function getStatusClass(status){
@@ -4000,6 +3996,53 @@ async function undoLastMetaImport(){
     button.disabled = false;
     button.innerText = 'Hoàn tác lần nhập gần nhất';
   }
+}
+
+function exportDashboardPdf(){
+  if(currentShowroom !== 'all' || currentPlatform !== 'all'){
+    alert('Vui lòng mở tab Tất cả showroom để xuất đúng dashboard tổng quan.');
+    return;
+  }
+  const dashboard = document.querySelector('.bi-dashboard');
+  if(!dashboard) return;
+  const clonedDashboard = dashboard.cloneNode(true);
+  const sourceControls = dashboard.querySelectorAll('input,select,textarea');
+  const clonedControls = clonedDashboard.querySelectorAll('input,select,textarea');
+  sourceControls.forEach((control, index) => {
+    const clone = clonedControls[index];
+    if(!clone) return;
+    if(control.type === 'checkbox' || control.type === 'radio') clone.checked = control.checked;
+    else clone.value = control.value;
+    if(clone.tagName === 'SELECT'){
+      Array.from(clone.options).forEach(option => { option.selected = option.value === control.value; });
+    }
+  });
+  clonedDashboard.querySelectorAll('.bi-filter-actions').forEach(element => element.remove());
+
+  const reportWindow = window.open('', '_blank');
+  if(!reportWindow){
+    alert('Trình duyệt đang chặn cửa sổ báo cáo. Vui lòng cho phép pop-up rồi thử lại.');
+    return;
+  }
+  reportWindow.opener = null;
+  const stylesheetUrl = new URL('style.css?v=20260803-31', window.location.href).href;
+  reportWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Dashboard Tất cả showroom</title>
+    <link rel="stylesheet" href="${stylesheetUrl}">
+    <style>
+      @page{size:A3 landscape;margin:8mm}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      html,body{margin:0!important;background:#07111f!important;color:#eaf6ff!important}
+      body{min-width:1500px;padding:12px!important}
+      .bi-dashboard{display:block!important;width:100%!important;margin:0!important;box-shadow:none!important}
+      .bi-shell{grid-template-columns:200px minmax(0,1fr)!important}
+      .no-print{position:fixed;z-index:9999;right:18px;top:18px;padding:11px 16px;border:0;border-radius:9px;background:#22d3ee;color:#062033;font-weight:900;cursor:pointer}
+      @media print{.no-print{display:none!important}body{padding:0!important}.bi-dashboard{break-inside:auto}.report-panel{break-inside:avoid}}
+    </style></head><body>
+    <button class="no-print" onclick="window.print()">Lưu thành PDF</button>
+    ${clonedDashboard.outerHTML}
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),800));<\/script>
+    </body></html>`);
+  reportWindow.document.close();
 }
 
 function getAllShowroomReportPosts(month){
