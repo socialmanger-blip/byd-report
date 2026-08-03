@@ -364,11 +364,17 @@ function applyAppView(){
   const isDashboard = currentAppView === 'dashboard';
   const isMedia = currentAppView === 'media';
   const isSop = currentAppView === 'sop';
+  const isGoogleMap = isDashboard && currentPlatform === 'Google Maps' && currentShowroom === 'all';
+  const isAccountPlatform = isDashboard && currentPlatform !== 'all' && currentPlatform !== 'Google Maps' && currentShowroom === 'all';
   $('mediaLibrary').classList.toggle('is-visible',isMedia);
   $('photoSopReference').classList.toggle('is-visible',isSop);
-  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => {
-    el.classList.toggle('is-hidden',!isDashboard);
+  document.querySelectorAll('.post-content').forEach(el => {
+    el.classList.toggle('is-hidden',!isDashboard || isGoogleMap);
   });
+  $('googleShowrooms').classList.toggle('is-visible',isGoogleMap);
+  $('googleShowrooms').classList.toggle('is-hidden',!isGoogleMap);
+  $('channelAccounts').classList.toggle('is-visible',isAccountPlatform);
+  $('channelAccounts').classList.toggle('is-hidden',!isAccountPlatform);
   $('btnOpenMediaLibrary').classList.toggle('active',isMedia);
   $('btnOpenPhotoSop').classList.toggle('active',isSop);
   setActivePlatformNav(currentPlatform);
