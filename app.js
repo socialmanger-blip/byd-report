@@ -2068,7 +2068,10 @@ async function loadMediaLibraryFromSupabase(){
     .map(row => row.folder)
     .filter(Boolean);
   const files = data
-    .filter(row => row.type !== 'folder' && row.type !== 'photo_sop_guide' && row.type !== 'post_metrics')
+    .filter(row => row.type !== 'folder'
+      && row.type !== 'photo_sop_guide'
+      && row.type !== 'post_metrics'
+      && row.type !== metaImportHistoryType)
     .map(row => ({
       id: row.id,
       name: row.name || 'Tệp chưa đặt tên',
