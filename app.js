@@ -236,6 +236,7 @@ function bindEvents(){
   bindClick('btnResetExportFields', resetExportFields);
   bindClick('btnResetGoogleReport', resetGoogleMapReport);
   bindClick('btnOpenMediaLibrary', openMediaLibrary);
+  bindClick('btnRecoverMediaLibrary', () => recoverMediaLibraryFromStorage({ notify:true }));
   bindClick('btnOpenPhotoSop', openPhotoSopReference);
   bindClick('btnAddSopItem', addPhotoSopItem);
   bindClick('btnResetSopGuide', resetPhotoSopGuide);
@@ -2082,6 +2083,108 @@ async function loadMediaLibraryFromSupabase(){
     files
   };
   saveMediaLibrary();
+  if(!files.length) await recoverMediaLibraryFromStorage({ notify:false });
+}
+
+function mediaStoragePathFromUrl(url){
+  const marker = `/storage/v1/object/public/${BUCKET_NAME}/`;
+  const value = String(url || '');
+  const markerIndex = value.indexOf(marker);
+  if(markerIndex < 0) return '';
+  return decodeURIComponent(value.slice(markerIndex + marker.length).split('?')[0]);
+}
+
+async function listStorageFilesRecursive(path, results = []){
+  let offset = 0;
+  const limit = 1000;
+  while(true){
+    const { data, error } = await supabaseClient.storage
+      .from(BUCKET_NAME)
+      .list(path, { limit, offset, sortBy:{ column:'name', order:'asc' } });
+    if(error) throw error;
+    const entries = data || [];
+    for(const entry of entries){
+      const entryPath = path ? `${path}/${entry.name}` : entry.name;
+      if(entry.id) results.push({ ...entry, path:entryPath });
+      else await listStorageFilesRecursive(entryPath, results);
+    }
+    if(entries.length < limit) break;
+    offset += limit;
+  }
+  return results;
+}
+
+async function recoverMediaLibraryFromStorage({ notify = true } = {}){
+  const button = $('btnRecoverMediaLibrary');
+  const previousText = button ? button.innerText : '';
+  try{
+    if(button){
+      button.disabled = true;
+      button.innerText = 'Đang quét Storage...';
+    }
+    const storedFiles = await listStorageFilesRecursive(mediaLibraryStorageFolder);
+    const existingPaths = new Set((mediaLibrary.files || [])
+      .map(file => mediaStoragePathFromUrl(file.url))
+      .filter(Boolean));
+    const missingFiles = storedFiles.filter(file => !existingPaths.has(file.path));
+    if(!missingFiles.length){
+      if(notify) alert(`Quét xong: ${storedFiles.length} tệp trong Storage, không có tệp bị thiếu trong Media Library.`);
+      return { scanned:storedFiles.length, recovered:0 };
+    }
+
+    const recoveryFolder = 'Khôi phục từ Storage';
+    const rows = missingFiles.map(file => {
+      const relativePath = file.path.slice(mediaLibraryStorageFolder.length).replace(/^\//, '');
+      const pathParts = relativePath.split('/');
+      const nestedFolder = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '';
+      const { data:urlData } = supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(file.path);
+      return {
+        name:file.name,
+        folder:nestedFolder || recoveryFolder,
+        url:urlData.publicUrl,
+        type:(file.metadata && (file.metadata.mimetype || file.metadata.contentType)) || guessMediaType(file.name),
+        size:toNumber(file.metadata && file.metadata.size),
+        uploaded_at:file.created_at || file.updated_at || new Date().toISOString()
+      };
+    });
+
+    const inserted = [];
+    for(let index = 0; index < rows.length; index += 100){
+      const { data, error } = await supabaseClient
+        .from('media_library')
+        .insert(rows.slice(index, index + 100))
+        .select('*');
+      if(error) throw error;
+      inserted.push(...(data || []));
+    }
+    const recoveredFiles = inserted.map(row => ({
+      id:row.id,
+      name:row.name,
+      folder:row.folder,
+      url:row.url,
+      type:row.type || 'application/octet-stream',
+      size:toNumber(row.size),
+      uploadedAt:row.uploaded_at
+    }));
+    mediaLibrary.files = [...recoveredFiles, ...(mediaLibrary.files || [])];
+    mediaLibrary.folders = normalizeMediaFolders(
+      [...defaultMediaFolders(), ...(mediaLibrary.folders || []), ...recoveredFiles.map(file => file.folder)],
+      mediaLibrary.files
+    );
+    saveMediaLibrary();
+    renderMediaLibrary();
+    if(notify) alert(`Đã khôi phục ${recoveredFiles.length} tệp từ Storage. Dữ liệu các tab khác không bị thay đổi.`);
+    return { scanned:storedFiles.length, recovered:recoveredFiles.length };
+  }catch(err){
+    console.error('Không thể quét lại Media Library từ Storage:', err);
+    if(notify) alert('Không thể quét Storage: ' + err.message);
+    return { scanned:0, recovered:0, error:err };
+  }finally{
+    if(button){
+      button.disabled = false;
+      button.innerText = previousText || 'Quét lại Storage';
+    }
+  }
 }
 
 async function migrateLocalMediaLibraryToSupabase(){

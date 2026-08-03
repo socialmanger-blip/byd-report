@@ -522,6 +522,12 @@ textarea:focus {
   display: block;
 }
 
+.media-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .sop-reference {
   display: none;
   margin-bottom: 16px;
