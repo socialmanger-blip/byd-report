@@ -483,6 +483,48 @@
     </div>
   </div>
 
+  <div class="modal" id="pdfExportModal">
+    <div class="modal-box export-box">
+      <div class="modal-head">
+        <div>
+          <h3>Tùy chọn báo cáo PDF</h3>
+          <small>Chọn phạm vi, chỉ số so sánh và các mục cần xuất</small>
+        </div>
+        <button class="icon" id="btnClosePdfExport">×</button>
+      </div>
+      <label>Phạm vi báo cáo</label>
+      <select id="pdfExportScope">
+        <option value="all">Toàn hệ thống (Trụ sở chính + 5 showroom)</option>
+        <option value="HO">Trụ sở chính</option>
+        <option value="Phú Quốc">Phú Quốc</option>
+        <option value="Cần Thơ">Cần Thơ</option>
+        <option value="Kiên Giang">Kiên Giang</option>
+        <option value="An Giang">An Giang</option>
+        <option value="Tiền Giang">Tiền Giang</option>
+      </select>
+      <label>Chỉ số dùng để so sánh tổng quan</label>
+      <select id="pdfComparisonMetric">
+        <option value="reach">Reach</option>
+        <option value="engagement">Engagement</option>
+        <option value="posts">Số bài đăng</option>
+        <option value="follow">Followers tăng</option>
+      </select>
+      <label>Chọn nội dung cần xuất</label>
+      <div class="export-fields pdf-section-options">
+        <label><input type="checkbox" value="summary" checked> Tổng quan KPI</label>
+        <label><input type="checkbox" value="overview" checked> Biểu đồ so sánh tổng quan</label>
+        <label><input type="checkbox" value="showrooms" checked> So sánh theo showroom</label>
+        <label><input type="checkbox" value="platforms" checked> So sánh theo nền tảng</label>
+        <label><input type="checkbox" value="topPosts" checked> Top bài đăng hiệu quả</label>
+        <label><input type="checkbox" value="details"> Danh sách bài đăng chi tiết</label>
+      </div>
+      <div class="modal-actions">
+        <button id="btnCancelPdfExport">Hủy</button>
+        <button class="primary" id="btnGeneratePdf">Tạo báo cáo PDF</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="metaImportModal">
     <div class="modal-box export-box meta-import-box">
       <div class="modal-head">
@@ -558,6 +600,6 @@
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260803-30"></script>
+  <script src="app.js?v=20260803-31"></script>
 </body>
 </html>

@@ -223,7 +223,10 @@ function bindEvents(){
   bindClick('btnReload', loadPosts);
   bindClick('btnOpenExport', openExportModal);
   bindClick('btnOpenExportTop', openExportModal);
-  bindClick('btnExportPdf', exportPdfReport);
+  bindClick('btnExportPdf', openPdfExportModal);
+  bindClick('btnClosePdfExport', closePdfExportModal);
+  bindClick('btnCancelPdfExport', closePdfExportModal);
+  bindClick('btnGeneratePdf', exportPdfReport);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -279,6 +282,7 @@ function bindEvents(){
   $('imageModal').addEventListener('click', (e)=>{ if(e.target.id==='imageModal') closeImage(); });
   $('postModal').addEventListener('click', (e)=>{ if(e.target.id==='postModal') closeModal(); });
   $('exportModal').addEventListener('click', (e)=>{ if(e.target.id==='exportModal') closeExportModal(); });
+  $('pdfExportModal').addEventListener('click', (e)=>{ if(e.target.id==='pdfExportModal') closePdfExportModal(); });
   $('metaImportModal').addEventListener('click', (e)=>{ if(e.target.id==='metaImportModal') closeMetaImportModal(); });
   $('mediaPickerModal').addEventListener('click', (e)=>{ if(e.target.id==='mediaPickerModal') closeMediaPicker(); });
   $('moveMediaModal').addEventListener('click', (e)=>{ if(e.target.id==='moveMediaModal') closeMoveMediaModal(); });
@@ -1240,7 +1244,7 @@ function updateWorkspaceActions(){
   document.querySelectorAll('.top-actions').forEach(el => {
     el.classList.toggle('is-hidden', currentShowroom === 'all' || currentPlatform === 'Google Maps');
   });
-  if($('btnExportPdf')) $('btnExportPdf').classList.toggle('is-hidden', currentShowroom !== 'all' || currentPlatform !== 'all');
+  if($('btnExportPdf')) $('btnExportPdf').classList.remove('is-hidden');
 }
 
 function getStatusClass(status){
@@ -4006,23 +4010,44 @@ function getAllShowroomReportPosts(month){
   });
 }
 
+function openPdfExportModal(){
+  const scope = $('pdfExportScope');
+  if(currentShowroom !== 'all') scope.value = currentShowroom;
+  else scope.value = 'all';
+  $('pdfExportModal').classList.add('open');
+}
+
+function closePdfExportModal(){
+  $('pdfExportModal').classList.remove('open');
+}
+
+function getPdfSelectedSections(){
+  return new Set(Array.from(document.querySelectorAll('.pdf-section-options input:checked')).map(input => input.value));
+}
+
 function exportPdfReport(){
-  if(currentShowroom !== 'all' || currentPlatform !== 'all'){
-    alert('Xuất PDF chỉ áp dụng tại tab Tất cả showroom.');
-    return;
-  }
   const month = $('monthFilter').value;
   if(!month){
     alert('Vui lòng chọn tháng trước khi xuất PDF.');
     return;
   }
-  const source = getAllShowroomReportPosts(month);
+  const reportScope = $('pdfExportScope').value;
+  const selectedSections = getPdfSelectedSections();
+  if(!selectedSections.size){
+    alert('Vui lòng chọn ít nhất một nội dung cần xuất.');
+    return;
+  }
+  const allSource = getAllShowroomReportPosts(month);
+  const source = reportScope === 'all'
+    ? allSource
+    : allSource.filter(post => showroomList(post.showroom).includes(reportScope));
   if(!source.length){
     alert('Không có dữ liệu trong tháng đã chọn để xuất PDF.');
     return;
   }
   const periodLabel = `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}`;
-  const units = reportShowroomNames.map(showroom => getShowroomCommunicationTotals(showroom, month));
+  const reportUnits = reportScope === 'all' ? reportShowroomNames : [reportScope];
+  const units = reportUnits.map(showroom => getShowroomCommunicationTotals(showroom, month));
   const total = units.reduce((acc, row) => {
     acc.posts += row.posts;
     acc.reach += row.reach;
@@ -4030,17 +4055,21 @@ function exportPdfReport(){
     acc.follow += row.follow;
     return acc;
   }, { posts:0, reach:0, engagement:0, follow:0 });
-  const platformNames = ['Facebook','TikTok','Website'];
+  const platformNames = ['Facebook','TikTok','Zalo OA','YouTube','Google Maps','Website'];
   const platformRows = platformNames.map(platform => {
     const items = source.filter(post => platformMatches(post.platform, platform));
     const reach = sumPostAliases(items, ['Số người tiếp cận','Reach']);
     const engagement = totalEngagementForPosts(items);
-    return { platform, posts:items.length, reach, engagement, rate:reach ? engagement / reach * 100 : 0 };
+    const follow = sumPostAliases(items, ['Lượt theo dõi','Followers','Follower']);
+    return { platform, posts:items.length, reach, engagement, follow, rate:reach ? engagement / reach * 100 : 0 };
   });
   const topPosts = source
     .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
     .sort((a,b) => b.value - a.value)
     .slice(0, 5);
+  const comparisonMetric = $('pdfComparisonMetric').value;
+  const comparisonLabels = { reach:'Reach', engagement:'Engagement', posts:'Số bài đăng', follow:'Followers tăng' };
+  const comparisonLabel = comparisonLabels[comparisonMetric] || 'Reach';
   const reportWindow = window.open('', '_blank');
   if(!reportWindow){
     alert('Trình duyệt đang chặn cửa sổ báo cáo. Vui lòng cho phép pop-up rồi thử lại.');
@@ -4051,10 +4080,13 @@ function exportPdfReport(){
   const platformTable = platformRows.map(row => `<tr><td>${row.platform}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td><td>${row.rate ? row.rate.toLocaleString('vi-VN',{maximumFractionDigits:2}) + '%' : '--'}</td><td>${row.posts}</td></tr>`).join('');
   const topRows = topPosts.map((item,index) => `<tr><td><span class="rank">${index+1}</span></td><td><b>${escapeHtml(item.post.title || 'Bài đăng không tiêu đề')}</b></td><td>${escapeHtml(item.post.platform || '-')}</td><td>${escapeHtml(item.post.showroom || '-')}</td><td><b>${formatMetricNumber(item.value)}</b></td></tr>`).join('');
   const postRows = source.slice(0, 100).map((post,index) => `<tr><td>${index+1}</td><td>${formatDate(post.post_date)}</td><td>${escapeHtml(post.platform || '-')}</td><td>${escapeHtml(post.showroom || '-')}</td><td>${escapeHtml(post.title || '-')}</td></tr>`).join('');
-  const maxUnitReach = Math.max(...units.map(row => row.reach), 1);
-  const maxPlatformReach = Math.max(...platformRows.map(row => row.reach), 1);
-  const unitChart = units.map((row,index) => `<div class="bar-row"><span>${escapeHtml(showroomDisplayName(row.showroom))}</span><div class="bar-track"><i style="width:${row.reach ? Math.max(3,row.reach/maxUnitReach*100) : 0}%;--bar-color:${['#22d3ee','#3b82f6','#8b5cf6','#10b981','#f59e0b','#ec4899'][index]}"></i></div><b>${formatMetricNumber(row.reach)}</b></div>`).join('');
-  const platformChart = platformRows.map((row,index) => `<div class="bar-row"><span>${row.platform}</span><div class="bar-track"><i style="width:${row.reach ? Math.max(3,row.reach/maxPlatformReach*100) : 0}%;--bar-color:${['#2563eb','#111827','#06b6d4'][index]}"></i></div><b>${formatMetricNumber(row.reach)}</b></div>`).join('');
+  const unitValue = row => toNumber(row[comparisonMetric]);
+  const platformValue = row => toNumber(row[comparisonMetric]);
+  const maxUnitValue = Math.max(...units.map(unitValue), 1);
+  const maxPlatformValue = Math.max(...platformRows.map(platformValue), 1);
+  const unitChart = units.map((row,index) => `<div class="bar-row"><span>${escapeHtml(showroomDisplayName(row.showroom))}</span><div class="bar-track"><i style="width:${unitValue(row) ? Math.max(3,unitValue(row)/maxUnitValue*100) : 0}%;--bar-color:${['#22d3ee','#3b82f6','#8b5cf6','#10b981','#f59e0b','#ec4899'][index % 6]}"></i></div><b>${formatMetricNumber(unitValue(row))}</b></div>`).join('');
+  const platformChart = platformRows.map((row,index) => `<div class="bar-row"><span>${row.platform}</span><div class="bar-track"><i style="width:${platformValue(row) ? Math.max(3,platformValue(row)/maxPlatformValue*100) : 0}%;--bar-color:${['#2563eb','#111827','#06b6d4','#8b5cf6','#10b981','#f59e0b'][index % 6]}"></i></div><b>${formatMetricNumber(platformValue(row))}</b></div>`).join('');
+  const scopeLabel = reportScope === 'all' ? 'Trụ sở chính và 5 showroom' : showroomDisplayName(reportScope);
   reportWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo truyền thông ${periodLabel}</title>
   <style>
     @page{size:A4;margin:11mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -4087,20 +4119,21 @@ function exportPdfReport(){
   </style></head><body>
   <button class="no-print" onclick="window.print()">Lưu thành PDF</button>
   <main class="report-page">
-    <header><div class="brand-row"><div class="brand"><div class="brand-mark">B</div><div><small>BYD NEG</small><div>Marketing Intelligence</div></div></div><div class="period-badge">${periodLabel}</div></div><h1>Social Media Performance Report</h1><p>Tổng hợp hiệu quả truyền thông của Trụ sở chính và 5 showroom</p></header>
+    <header><div class="brand-row"><div class="brand"><div class="brand-mark">B</div><div><small>BYD NEG</small><div>Marketing Intelligence</div></div></div><div class="period-badge">${periodLabel}</div></div><h1>Social Media Performance Report</h1><p>Phạm vi báo cáo: ${escapeHtml(scopeLabel)}</p></header>
     <div class="content">
-      <section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>
-      <section class="section"><div class="section-head"><div><h2>Executive Overview</h2><p>So sánh Reach theo đơn vị và nền tảng</p></div><span class="section-tag">Power BI View</span></div><div class="dashboard-grid"><div class="chart-card"><h3>Reach theo đơn vị</h3>${unitChart}</div><div class="chart-card"><h3>Reach theo nền tảng</h3>${platformChart}</div></div></section>
-      <section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết 6 đơn vị</p></div><span class="section-tag">6 đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>
-      <section class="section"><div class="section-head"><div><h2>Platform Performance</h2><p>Hiệu quả theo kênh truyền thông</p></div><span class="section-tag">Channel mix</span></div><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table></section>
-      <section class="section"><div class="section-head"><div><h2>Top Performing Posts</h2><p>5 bài đăng nổi bật nhất trong kỳ</p></div><span class="section-tag">Top 5</span></div><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table></section>
-      <section class="section page-break"><div class="section-head"><div><h2>Post Details</h2><p>Danh sách bài đăng thuộc kỳ báo cáo</p></div><span class="section-tag">${source.length} bài</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table></section>
+      ${selectedSections.has('summary') ? `<section class="summary"><div><span>Tổng Reach</span><b>${formatMetricNumber(total.reach)}</b></div><div><span>Tổng Engagement</span><b>${formatMetricNumber(total.engagement)}</b></div><div><span>Tổng bài đăng</span><b>${formatMetricNumber(total.posts)}</b></div><div><span>Followers tăng</span><b>${formatMetricNumber(total.follow)}</b></div></section>` : ''}
+      ${selectedSections.has('overview') ? `<section class="section"><div class="section-head"><div><h2>Executive Overview</h2><p>So sánh ${comparisonLabel} theo đơn vị và nền tảng</p></div><span class="section-tag">Power BI View</span></div><div class="dashboard-grid"><div class="chart-card"><h3>${comparisonLabel} theo đơn vị</h3>${unitChart}</div><div class="chart-card"><h3>${comparisonLabel} theo nền tảng</h3>${platformChart}</div></div></section>` : ''}
+      ${selectedSections.has('showrooms') ? `<section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết theo đơn vị</p></div><span class="section-tag">${units.length} đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>` : ''}
+      ${selectedSections.has('platforms') ? `<section class="section"><div class="section-head"><div><h2>Platform Performance</h2><p>Hiệu quả theo kênh truyền thông</p></div><span class="section-tag">Channel mix</span></div><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table></section>` : ''}
+      ${selectedSections.has('topPosts') ? `<section class="section"><div class="section-head"><div><h2>Top Performing Posts</h2><p>5 bài đăng nổi bật nhất trong kỳ</p></div><span class="section-tag">Top 5</span></div><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table></section>` : ''}
+      ${selectedSections.has('details') ? `<section class="section page-break"><div class="section-head"><div><h2>Post Details</h2><p>Danh sách bài đăng thuộc kỳ báo cáo</p></div><span class="section-tag">${source.length} bài</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table></section>` : ''}
       <p class="note">Báo cáo được tổng hợp từ dữ liệu hiện có của 6 đơn vị trong tháng được chọn. Danh sách chi tiết hiển thị tối đa 100 bài; dùng Xuất Excel để lấy toàn bộ dữ liệu.</p>
       <div class="footer"><span>SocialHub · BYD NEG</span><span>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</span></div>
     </div>
   </main>
   <script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
   reportWindow.document.close();
+  closePdfExportModal();
 }
 
 function openExportModal(){
