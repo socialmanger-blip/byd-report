@@ -2,6 +2,7 @@ let posts = [];
 let currentPlatform = 'all';
 let currentShowroom = 'all';
 let currentBiView = 'overview';
+let currentAppView = 'dashboard';
 let editingId = null;
 let editingImageUrls = [];
 let editingMediaUrls = [];
@@ -349,39 +350,46 @@ function setBiView(view = 'overview'){
 
 function setActivePlatformNav(platform){
   document.querySelectorAll('.nav').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.platform === platform);
+    btn.classList.toggle('active', currentAppView === 'dashboard' && btn.dataset.platform === platform);
   });
 }
 
 function setActiveShowroomNav(showroom){
   document.querySelectorAll('.showroom-nav').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.showroom === showroom);
+    btn.classList.toggle('active', currentAppView === 'dashboard' && btn.dataset.showroom === showroom);
   });
 }
 
+function applyAppView(){
+  const isDashboard = currentAppView === 'dashboard';
+  const isMedia = currentAppView === 'media';
+  const isSop = currentAppView === 'sop';
+  $('mediaLibrary').classList.toggle('is-visible',isMedia);
+  $('photoSopReference').classList.toggle('is-visible',isSop);
+  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => {
+    el.classList.toggle('is-hidden',!isDashboard);
+  });
+  $('btnOpenMediaLibrary').classList.toggle('active',isMedia);
+  $('btnOpenPhotoSop').classList.toggle('active',isSop);
+  setActivePlatformNav(currentPlatform);
+  setActiveShowroomNav(currentShowroom);
+}
+
 function openMediaLibrary(){
-  document.querySelectorAll('.nav,.showroom-nav,.library-nav').forEach(btn => btn.classList.remove('active'));
-  $('btnOpenMediaLibrary').classList.add('active');
-  $('mediaLibrary').classList.add('is-visible');
-  $('photoSopReference').classList.remove('is-visible');
-  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
+  currentAppView = 'media';
+  applyAppView();
   renderMediaLibrary();
 }
 
 function openPhotoSopReference(){
-  document.querySelectorAll('.nav,.showroom-nav,.library-nav').forEach(btn => btn.classList.remove('active'));
-  $('btnOpenPhotoSop').classList.add('active');
-  $('photoSopReference').classList.add('is-visible');
-  $('mediaLibrary').classList.remove('is-visible');
-  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.add('is-hidden'));
+  currentAppView = 'sop';
+  applyAppView();
   renderPhotoSopGuide();
 }
 
 function closeMediaLibraryView(){
-  document.querySelectorAll('.library-nav').forEach(btn => btn.classList.remove('active'));
-  $('mediaLibrary').classList.remove('is-visible');
-  $('photoSopReference').classList.remove('is-visible');
-  document.querySelectorAll('.post-content,.google-showrooms,.channel-accounts').forEach(el => el.classList.remove('is-hidden'));
+  currentAppView = 'dashboard';
+  applyAppView();
 }
 
 function defaultPhotoSopGuide(){
@@ -1208,6 +1216,7 @@ function renderPosts(){
   updateWorkspaceActions();
   updateReportPanels();
   updateStats();
+  applyAppView();
   if(result.length === 0){
     const message = posts.length
       ? 'Không có bài phù hợp với bộ lọc hiện tại'
