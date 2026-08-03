@@ -226,7 +226,7 @@ function bindEvents(){
   bindClick('btnExportPdf', openPdfExportModal);
   bindClick('btnClosePdfExport', closePdfExportModal);
   bindClick('btnCancelPdfExport', closePdfExportModal);
-  bindClick('btnGeneratePdf', exportDashboardReport);
+  bindClick('btnGeneratePdf', exportNativeDashboardReport);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -4067,7 +4067,116 @@ function closePdfExportModal(){
 }
 
 function getPdfSelectedSections(){
-  return new Set(Array.from(document.querySelectorAll('.pdf-report-sections input:checked')).map(input => input.value));
+  const views = Array.from(document.querySelectorAll('.dashboard-export-views input:checked')).map(input => input.value);
+  const sectionMap = {
+    overview:['summary','overview','timing','content','topPosts'],
+    platform:['platforms'],
+    showroom:['showrooms'],
+    monthly:['comparison','trends','status']
+  };
+  return new Set(views.flatMap(view => sectionMap[view] || []));
+}
+
+async function exportNativeDashboardReport(){
+  const month = $('pdfReportMonth').value;
+  const format = $('dashboardExportFormat').value;
+  const views = Array.from(document.querySelectorAll('.dashboard-export-views input:checked')).map(input => input.value);
+  if(!month){ alert('Vui lòng chọn tháng báo cáo.'); return; }
+  if(!views.length){ alert('Vui lòng chọn ít nhất một trang dashboard.'); return; }
+  if(format === 'pdf'){
+    exportPdfReport();
+    return;
+  }
+  await exportNativeDashboardPptx(month, views);
+}
+
+async function exportNativeDashboardPptx(month, views){
+  if(typeof PptxGenJS === 'undefined'){ alert('Chưa tải được công cụ tạo PowerPoint.'); return; }
+  const button = $('btnGeneratePdf');
+  const previousText = button.innerText;
+  try{
+    button.disabled = true;
+    button.innerText = 'Đang dựng PowerPoint...';
+    const pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE';
+    pptx.author = 'SocialHub BYD NEG';
+    pptx.subject = `Dashboard tháng ${month}`;
+    pptx.title = `Social Media Performance Dashboard ${month}`;
+    pptx.company = 'BYD NEG';
+    pptx.lang = 'vi-VN';
+    pptx.theme = { headFontFace:'Aptos Display', bodyFontFace:'Aptos', lang:'vi-VN' };
+    const colors = { bg:'07111F', panel:'0D223D', panel2:'102A49', cyan:'22D3EE', blue:'3B82F6', green:'34D399', yellow:'FBBF24', purple:'8B5CF6', white:'F8FCFF', muted:'9FB3C8', line:'244563' };
+    const periodLabel = `Tháng ${Number(month.slice(5,7))}/${month.slice(0,4)}`;
+    const source = getAllShowroomReportPosts(month);
+    if(!source.length){ alert('Không có dữ liệu trong tháng đã chọn.'); return; }
+    const units = reportShowroomNames.map(showroom => getShowroomCommunicationTotals(showroom,month));
+    const total = units.reduce((acc,row) => ({ posts:acc.posts+row.posts, reach:acc.reach+row.reach, engagement:acc.engagement+row.engagement, follow:acc.follow+row.follow }), {posts:0,reach:0,engagement:0,follow:0});
+    const platforms = ['Facebook','TikTok','Zalo OA','YouTube','Google Maps'].map(platform => {
+      const items = source.filter(post => platformMatches(post.platform,platform));
+      const reach = sumMetricAliases(items,['Số người tiếp cận','Reach']);
+      const engagement = totalEngagementForPosts(items);
+      return { platform, posts:items.length, reach, engagement, rate:reach ? engagement/reach*100 : 0 };
+    });
+    const addBase = (title,subtitle) => {
+      const slide = pptx.addSlide();
+      slide.background = { color:colors.bg };
+      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.333,h:.13,fill:{color:colors.cyan},line:{color:colors.cyan}});
+      slide.addText('SOCIALHUB  |  BYD NEG',{x:.45,y:.28,w:3.4,h:.28,fontSize:10,bold:true,color:colors.cyan,margin:0,charSpacing:1.2});
+      slide.addText(title,{x:.45,y:.68,w:8.8,h:.48,fontSize:25,bold:true,color:colors.white,margin:0});
+      slide.addText(subtitle,{x:.45,y:1.18,w:9.5,h:.28,fontSize:10,color:colors.muted,margin:0});
+      slide.addText(periodLabel,{x:10.75,y:.55,w:2.05,h:.42,fontSize:11,bold:true,color:colors.white,align:'center',valign:'mid',fill:{color:colors.panel2},line:{color:colors.line},radius:.1,margin:0});
+      slide.addText('Marketing Intelligence',{x:10.75,y:1.08,w:2.05,h:.22,fontSize:8,color:colors.muted,align:'center',margin:0});
+      return slide;
+    };
+    const addTable = (slide,rows,x,y,w,h,widths) => slide.addTable(rows,{x,y,w,h,border:{type:'solid',color:colors.line,pt:1},fill:colors.panel,fontFace:'Aptos',fontSize:10,color:colors.white,margin:.07,colW:widths,rowH:.42,autoFit:false,bold:false,breakLine:false});
+
+    if(views.includes('overview')){
+      const slide = addBase('Executive Overview','Tổng quan hiệu quả truyền thông toàn hệ thống');
+      const cards = [['TỔNG REACH',total.reach,colors.cyan],['ENGAGEMENT',total.engagement,colors.green],['BÀI ĐĂNG',total.posts,colors.yellow],['FOLLOWERS TĂNG',total.follow,colors.purple]];
+      cards.forEach((card,index) => {
+        const x=.45+index*3.15;
+        slide.addShape(pptx.ShapeType.roundRect,{x,y:1.72,w:2.92,h:1.08,rectRadius:.08,fill:{color:colors.panel},line:{color:colors.line,pt:1}});
+        slide.addShape(pptx.ShapeType.rect,{x,y:1.72,w:.08,h:1.08,fill:{color:card[2]},line:{color:card[2]}});
+        slide.addText(card[0],{x:x+.24,y:1.92,w:2.35,h:.2,fontSize:8,bold:true,color:colors.muted,margin:0});
+        slide.addText(formatMetricNumber(card[1]),{x:x+.24,y:2.2,w:2.35,h:.4,fontSize:22,bold:true,color:colors.white,margin:0});
+      });
+      slide.addText('REACH THEO ĐƠN VỊ',{x:.62,y:3.22,w:3,h:.25,fontSize:10,bold:true,color:colors.white,margin:0});
+      const maxReach=Math.max(...units.map(row=>row.reach),1);
+      units.forEach((row,index) => {
+        const y=3.62+index*.53;
+        slide.addText(showroomDisplayName(row.showroom),{x:.62,y,w:1.65,h:.2,fontSize:8,color:colors.muted,margin:0});
+        slide.addShape(pptx.ShapeType.roundRect,{x:2.35,y:y-.02,w:7.7,h:.18,rectRadius:.04,fill:{color:'183553'},line:{color:'183553'}});
+        slide.addShape(pptx.ShapeType.roundRect,{x:2.35,y:y-.02,w:Math.max(.04,7.7*row.reach/maxReach),h:.18,rectRadius:.04,fill:{color:[colors.cyan,colors.blue,colors.purple,colors.green,colors.yellow,'EC4899'][index]},line:{color:[colors.cyan,colors.blue,colors.purple,colors.green,colors.yellow,'EC4899'][index]}});
+        slide.addText(formatMetricNumber(row.reach),{x:10.25,y:y-.07,w:1.2,h:.25,fontSize:9,bold:true,color:colors.white,align:'right',margin:0});
+      });
+    }
+    if(views.includes('platform')){
+      const slide=addBase('Platform Performance','Hiệu quả truyền thông theo từng nền tảng');
+      const rows=[[{text:'NỀN TẢNG',options:{bold:true,fill:colors.panel2,color:colors.cyan}},{text:'BÀI ĐĂNG',options:{bold:true,fill:colors.panel2}},{text:'REACH',options:{bold:true,fill:colors.panel2}},{text:'ENGAGEMENT',options:{bold:true,fill:colors.panel2}},{text:'TỶ LỆ',options:{bold:true,fill:colors.panel2}}],...platforms.map(row=>[row.platform,String(row.posts),formatMetricNumber(row.reach),formatMetricNumber(row.engagement),row.rate.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%'])];
+      addTable(slide,rows,.55,1.75,12.2,4.4,[3.1,1.8,2.4,2.5,1.7]);
+    }
+    if(views.includes('showroom')){
+      const slide=addBase('Showroom Analysis','So sánh Trụ sở chính và 5 showroom');
+      const rows=[[{text:'ĐƠN VỊ',options:{bold:true,fill:colors.panel2,color:colors.cyan}},{text:'BÀI ĐĂNG',options:{bold:true,fill:colors.panel2}},{text:'REACH',options:{bold:true,fill:colors.panel2}},{text:'ENGAGEMENT',options:{bold:true,fill:colors.panel2}},{text:'FOLLOWERS',options:{bold:true,fill:colors.panel2}}],...units.map(row=>[showroomDisplayName(row.showroom),String(row.posts),formatMetricNumber(row.reach),formatMetricNumber(row.engagement),formatMetricNumber(row.follow)])];
+      addTable(slide,rows,.55,1.75,12.2,4.8,[3.5,1.6,2.3,2.3,1.8]);
+    }
+    if(views.includes('monthly')){
+      const slide=addBase('Monthly Trends','So sánh hiệu quả với tháng trước');
+      const previous=previousMonthKey(month);
+      const before=getAllShowroomReportPosts(previous);
+      const metrics=[['Bài đăng',source.length,before.length],['Reach',sumMetricAliases(source,['Số người tiếp cận','Reach']),sumMetricAliases(before,['Số người tiếp cận','Reach'])],['Engagement',totalEngagementForPosts(source),totalEngagementForPosts(before)],['Lượt xem',sumMetricAliases(source,['Lượt xem']),sumMetricAliases(before,['Lượt xem'])],['Click liên kết',sumMetricAliases(source,['Lượt click vào liên kết']),sumMetricAliases(before,['Lượt click vào liên kết'])]];
+      const rows=[[{text:'CHỈ TIÊU',options:{bold:true,fill:colors.panel2,color:colors.cyan}},{text:'THÁNG TRƯỚC',options:{bold:true,fill:colors.panel2}},{text:'THÁNG NÀY',options:{bold:true,fill:colors.panel2}},{text:'BIẾN ĐỘNG',options:{bold:true,fill:colors.panel2}}],...metrics.map(([label,current,prev])=>[label,formatMetricNumber(prev),formatMetricNumber(current),comparisonChange(current,prev).label])];
+      addTable(slide,rows,.55,1.75,12.2,4.4,[3.4,2.4,2.4,3.1]);
+    }
+    await pptx.writeFile({fileName:`SocialHub-PowerBI-${month}.pptx`});
+    closePdfExportModal();
+  }catch(err){
+    console.error('Không thể tạo PowerPoint native:',err);
+    alert('Không thể tạo PowerPoint: '+err.message);
+  }finally{
+    button.disabled=false;
+    button.innerText=previousText;
+  }
 }
 
 function nextDashboardPaint(){
