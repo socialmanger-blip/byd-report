@@ -24,6 +24,7 @@ const notificationReadStorageKey = 'socialhub_notification_read_v1';
 const metaImportHistoryType = 'meta_import_history';
 const photoSopFolderRoot = 'SOP Chụp ảnh';
 const mediaLibraryStorageFolder = 'media-library';
+const mediaLibraryBackupPath = 'system/media-library-index.json';
 const reportShowroomNames = ['HO', 'Phú Quốc', 'Cần Thơ', 'Kiên Giang', 'An Giang', 'Tiền Giang'];
 const showroomNames = reportShowroomNames;
 const showroomDashboardChannels = ['Facebook', 'TikTok', 'Zalo OA', 'Google Maps'];
@@ -123,6 +124,8 @@ let expandedMediaFolders = new Set();
 let movingMediaFileId = null;
 let selectedLibraryMediaUrls = [];
 let pendingPickedMedia = new Set();
+let mediaLibraryBackupReady = false;
+let mediaLibraryBackupTimer = null;
 
 const defaultExportFields = [
   { key:'stt', label:'STT', checked:true },
@@ -226,7 +229,7 @@ function bindEvents(){
   bindClick('btnExportPdf', openPdfExportModal);
   bindClick('btnClosePdfExport', closePdfExportModal);
   bindClick('btnCancelPdfExport', closePdfExportModal);
-  bindClick('btnGeneratePdf', exportNativeDashboardReport);
+  bindClick('btnGeneratePdf', exportPdfReport);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -2050,21 +2053,70 @@ function loadMediaLibrary(){
 
 function saveMediaLibrary(){
   localStorage.setItem(mediaLibraryStorageKey, JSON.stringify(mediaLibrary));
+  if(mediaLibraryBackupReady && appReady && currentUser){
+    clearTimeout(mediaLibraryBackupTimer);
+    mediaLibraryBackupTimer = setTimeout(() => {
+      saveMediaLibraryBackupToStorage().catch(err => console.warn('Không sao lưu được cấu trúc Media Library:',err));
+    },500);
+  }
+}
+
+function mergeMediaLibraryState(base, overlay){
+  const baseState = base || { folders:[], files:[] };
+  const overlayState = overlay || { folders:[], files:[] };
+  const fileMap = new Map();
+  [...(baseState.files || []), ...(overlayState.files || [])].forEach(file => {
+    const key = file.url || file.id;
+    if(key) fileMap.set(key,file);
+  });
+  const files = Array.from(fileMap.values());
+  return {
+    folders:normalizeMediaFolders([...(baseState.folders || []), ...(overlayState.folders || [])],files),
+    files
+  };
+}
+
+async function loadMediaLibraryBackupFromStorage(){
+  const { data, error } = await supabaseClient.storage.from(BUCKET_NAME).download(mediaLibraryBackupPath);
+  if(error){
+    if(String(error.message || '').toLowerCase().includes('not found')) return null;
+    console.warn('Không đọc được bản sao Media Library:',error);
+    return null;
+  }
+  try{
+    const parsed = JSON.parse(await data.text());
+    return parsed && parsed.mediaLibrary ? parsed.mediaLibrary : null;
+  }catch(err){
+    console.warn('Bản sao Media Library không hợp lệ:',err);
+    return null;
+  }
+}
+
+async function saveMediaLibraryBackupToStorage(){
+  const payload = JSON.stringify({ version:1, savedAt:new Date().toISOString(), mediaLibrary });
+  const blob = new Blob([payload],{type:'application/json'});
+  const { error } = await supabaseClient.storage.from(BUCKET_NAME).upload(mediaLibraryBackupPath,blob,{upsert:true,contentType:'application/json'});
+  if(error) throw error;
 }
 
 async function loadMediaLibraryFromSupabase(){
+  const backupState = await loadMediaLibraryBackupFromStorage();
   const { data, error } = await supabaseClient
     .from('media_library')
     .select('*')
     .order('uploaded_at', { ascending:false });
   if(error){
     console.warn('Không đọc được Media Library từ Supabase:', error);
-    mediaLibrary = loadMediaLibrary();
+    mediaLibrary = mergeMediaLibraryState(loadMediaLibrary(),backupState);
+    mediaLibraryBackupReady = true;
+    saveMediaLibrary();
     return;
   }
   if(!data || !data.length){
-    mediaLibrary = loadMediaLibrary();
+    mediaLibrary = mergeMediaLibraryState(loadMediaLibrary(),backupState);
     await migrateLocalMediaLibraryToSupabase();
+    mediaLibraryBackupReady = true;
+    saveMediaLibrary();
     return;
   }
   const folders = data
@@ -2089,6 +2141,8 @@ async function loadMediaLibraryFromSupabase(){
     folders: normalizeMediaFolders([...defaultMediaFolders(), ...folders, ...files.map(file => file.folder)], files),
     files
   };
+  mediaLibrary = mergeMediaLibraryState(mediaLibrary,backupState);
+  mediaLibraryBackupReady = true;
   saveMediaLibrary();
   if(!files.length) await recoverMediaLibraryFromStorage({ notify:false });
 }

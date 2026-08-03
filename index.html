@@ -488,17 +488,12 @@
       <div class="modal-head">
         <div>
           <h3>Xuất báo cáo Power BI</h3>
-          <small>Xuất đúng giao diện dashboard sang PDF hoặc PowerPoint</small>
+          <small>Chọn tháng và các trang dashboard cần đưa vào PDF</small>
         </div>
         <button class="icon" id="btnClosePdfExport">×</button>
       </div>
       <label>Tháng báo cáo</label>
       <input id="pdfReportMonth" type="month" />
-      <label>Định dạng file</label>
-      <select id="dashboardExportFormat">
-        <option value="pdf">PDF báo cáo</option>
-        <option value="pptx">PowerPoint (.pptx)</option>
-      </select>
       <label>Các trang dashboard cần xuất</label>
       <div class="export-fields pdf-report-sections dashboard-export-views">
         <label><input type="checkbox" value="overview" checked><span><b>Overview</b><small>KPI, khung giờ, hiệu quả nội dung và tổng quan hệ thống</small></span></label>
@@ -508,7 +503,7 @@
       </div>
       <div class="modal-actions">
         <button id="btnCancelPdfExport">Hủy</button>
-        <button class="primary" id="btnGeneratePdf">Xuất dashboard</button>
+        <button class="primary" id="btnGeneratePdf">Tạo báo cáo PDF</button>
       </div>
     </div>
   </div>
@@ -586,9 +581,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260803-36"></script>
+  <script src="app.js?v=20260803-38"></script>
 </body>
 </html>
