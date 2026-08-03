@@ -2219,12 +2219,13 @@ async function migrateLocalMediaLibraryToSupabase(){
 
 async function saveMediaFolderToSupabase(folder){
   if(!folder) return;
-  const { data } = await supabaseClient
+  const { data, error:selectError } = await supabaseClient
     .from('media_library')
     .select('id')
     .eq('folder', folder)
     .eq('type', 'folder')
     .limit(1);
+  if(selectError) throw selectError;
   if(data && data.length) return;
   const { error } = await supabaseClient.from('media_library').insert({
     name: '.folder',
@@ -2236,24 +2237,37 @@ async function saveMediaFolderToSupabase(folder){
   if(error) throw error;
 }
 
-function updateMediaFolderInSupabase(folder, nextFolder){
-  supabaseClient
+async function updateMediaFolderInSupabase(folder, nextFolder){
+  const { data:exactRows, error:exactError } = await supabaseClient
     .from('media_library')
-    .update({ folder: nextFolder })
-    .eq('folder', folder)
-    .then(({ error }) => {
-      if(error) console.warn('Không đổi tên thư mục trên Supabase:', error);
-    });
+    .select('id,folder')
+    .eq('folder', folder);
+  if(exactError) throw exactError;
+  const { data:childRows, error:childError } = await supabaseClient
+    .from('media_library')
+    .select('id,folder')
+    .like('folder', `${folder}/%`);
+  if(childError) throw childError;
+  for(const row of [...(exactRows || []), ...(childRows || [])]){
+    const renamedFolder = row.folder === folder
+      ? nextFolder
+      : `${nextFolder}${row.folder.slice(folder.length)}`;
+    const { error } = await supabaseClient
+      .from('media_library')
+      .update({ folder:renamedFolder })
+      .eq('id', row.id);
+    if(error) throw error;
+  }
 }
 
-function deleteMediaFolderFromSupabase(folder){
-  supabaseClient
+async function deleteMediaFolderFromSupabase(folder){
+  const { error:childError } = await supabaseClient
     .from('media_library')
     .delete()
-    .eq('folder', folder)
-    .then(({ error }) => {
-      if(error) console.warn('Không xóa được thư mục trên Supabase:', error);
-    });
+    .like('folder', `${folder}/%`);
+  if(childError) throw childError;
+  const { error } = await supabaseClient.from('media_library').delete().eq('folder', folder);
+  if(error) throw error;
 }
 
 function isUuid(value){
@@ -2524,10 +2538,11 @@ async function uploadPostFilesToMediaLibrary(files){
 
 async function uploadFileToMediaLibrary(file, folder){
   if(folder && !mediaLibrary.folders.includes(folder)){
-    mediaLibrary.folders.push(folder);
     await saveMediaFolderToSupabase(folder);
+    mediaLibrary.folders.push(folder);
   }
-  const url = await uploadFile(file, mediaLibraryStorageFolder);
+  const storageFolder = mediaLibraryStoragePath(folder);
+  const url = await uploadFile(file, storageFolder);
   const row = {
     name: file.name,
     folder,
@@ -2552,7 +2567,16 @@ async function uploadFileToMediaLibrary(file, folder){
   return item;
 }
 
-function createMediaFolder(parentFolder = ''){
+function mediaLibraryStoragePath(folder){
+  const safeFolder = String(folder || '')
+    .split('/')
+    .map(part => part.trim().replace(/[\\?#%]+/g, '-').replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .join('/');
+  return safeFolder ? `${mediaLibraryStorageFolder}/${safeFolder}` : mediaLibraryStorageFolder;
+}
+
+async function createMediaFolder(parentFolder = ''){
   const baseFolder = parentFolder || (currentMediaFolder !== 'all' ? currentMediaFolder : '');
   const label = baseFolder ? `Tạo thư mục con trong "${baseFolder}"` : 'Nhập tên thư mục';
   const name = prompt(label);
@@ -2561,16 +2585,24 @@ function createMediaFolder(parentFolder = ''){
   if(!cleanName) return;
   const folder = baseFolder && !cleanName.includes('/') ? `${baseFolder}/${cleanName}` : cleanName;
   if(!folder) return;
-  if(!mediaLibrary.folders.includes(folder)) mediaLibrary.folders.push(folder);
-  currentMediaFolder = folder;
-  if(baseFolder) expandedMediaFolders.add(baseFolder);
-  expandFolderAncestors(folder);
-  saveMediaLibrary();
-  saveMediaFolderToSupabase(folder).catch(err => console.warn('Không lưu được thư mục lên Supabase:', err));
-  renderMediaLibrary();
+  if(mediaLibrary.folders.includes(folder)){
+    alert('Thư mục này đã tồn tại');
+    return;
+  }
+  try{
+    await saveMediaFolderToSupabase(folder);
+    mediaLibrary.folders.push(folder);
+    currentMediaFolder = folder;
+    if(baseFolder) expandedMediaFolders.add(baseFolder);
+    expandFolderAncestors(folder);
+    saveMediaLibrary();
+    renderMediaLibrary();
+  }catch(err){
+    alert('Không tạo được thư mục trên Supabase: ' + err.message);
+  }
 }
 
-function renameMediaFolder(folder){
+async function renameMediaFolder(folder){
   const name = prompt('Tên thư mục mới', folder);
   if(!name) return;
   const nextFolder = name.trim();
@@ -2579,29 +2611,43 @@ function renameMediaFolder(folder){
     alert('Thư mục này đã tồn tại');
     return;
   }
-  mediaLibrary.folders = mediaLibrary.folders.map(item => item === folder ? nextFolder : item);
-  mediaLibrary.files.forEach(file => {
-    if(file.folder === folder) file.folder = nextFolder;
-  });
-  if(currentMediaFolder === folder) currentMediaFolder = nextFolder;
-  saveMediaLibrary();
-  saveMediaFolderToSupabase(nextFolder).catch(err => console.warn('Không lưu được tên thư mục mới lên Supabase:', err));
-  updateMediaFolderInSupabase(folder, nextFolder);
-  renderMediaLibrary();
+  try{
+    await updateMediaFolderInSupabase(folder, nextFolder);
+    mediaLibrary.folders = mediaLibrary.folders.map(item => item === folder || item.startsWith(`${folder}/`)
+      ? `${nextFolder}${item.slice(folder.length)}`
+      : item);
+    mediaLibrary.files.forEach(file => {
+      if(file.folder === folder || file.folder.startsWith(`${folder}/`)){
+        file.folder = `${nextFolder}${file.folder.slice(folder.length)}`;
+      }
+    });
+    if(currentMediaFolder === folder || currentMediaFolder.startsWith(`${folder}/`)){
+      currentMediaFolder = `${nextFolder}${currentMediaFolder.slice(folder.length)}`;
+    }
+    saveMediaLibrary();
+    renderMediaLibrary();
+  }catch(err){
+    alert('Không đổi được tên thư mục trên Supabase: ' + err.message);
+  }
 }
 
-function deleteMediaFolder(folder){
-  const fileCount = mediaLibrary.files.filter(file => file.folder === folder).length;
+async function deleteMediaFolder(folder){
+  const belongsToFolder = value => value === folder || value.startsWith(`${folder}/`);
+  const fileCount = mediaLibrary.files.filter(file => belongsToFolder(file.folder)).length;
   const message = fileCount
     ? `Xóa thư mục "${folder}" và ${fileCount} tệp trong thư mục khỏi Media Library?`
     : `Xóa thư mục "${folder}"?`;
   if(!confirm(message)) return;
-  mediaLibrary.folders = mediaLibrary.folders.filter(item => item !== folder);
-  mediaLibrary.files = mediaLibrary.files.filter(file => file.folder !== folder);
-  if(currentMediaFolder === folder) currentMediaFolder = 'all';
-  saveMediaLibrary();
-  deleteMediaFolderFromSupabase(folder);
-  renderMediaLibrary();
+  try{
+    await deleteMediaFolderFromSupabase(folder);
+    mediaLibrary.folders = mediaLibrary.folders.filter(item => !belongsToFolder(item));
+    mediaLibrary.files = mediaLibrary.files.filter(file => !belongsToFolder(file.folder));
+    if(belongsToFolder(currentMediaFolder)) currentMediaFolder = 'all';
+    saveMediaLibrary();
+    renderMediaLibrary();
+  }catch(err){
+    alert('Không xóa được thư mục trên Supabase: ' + err.message);
+  }
 }
 
 async function renameMediaFile(id){
