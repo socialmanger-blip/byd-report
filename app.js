@@ -4107,6 +4107,67 @@ function exportPdfReport(){
     .map(post => ({ post, value:getPostPerformanceValue(post, '__engagement__') || heatmapMetricValue(post, 'Số người tiếp cận') }))
     .sort((a,b) => b.value - a.value)
     .slice(0, 5);
+  const previousMonth = previousMonthKey(month);
+  const previousSource = getAllShowroomReportPosts(previousMonth);
+  const comparisonRows = [
+    { label:'Bài đăng', current:source.length, previous:previousSource.length },
+    { label:'Reach', current:sumMetricAliases(source,['Số người tiếp cận','Reach']), previous:sumMetricAliases(previousSource,['Số người tiếp cận','Reach']) },
+    { label:'Engagement', current:totalEngagementForPosts(source), previous:totalEngagementForPosts(previousSource) },
+    { label:'Lượt xem', current:sumMetricAliases(source,['Lượt xem']), previous:sumMetricAliases(previousSource,['Lượt xem']) },
+    { label:'Click liên kết', current:sumMetricAliases(source,['Lượt click vào liên kết']), previous:sumMetricAliases(previousSource,['Lượt click vào liên kết']) }
+  ].map(metric => {
+    const change = comparisonChange(metric.current, metric.previous);
+    return `<tr><td><b>${metric.label}</b></td><td>${formatMetricNumber(metric.previous)}</td><td>${formatMetricNumber(metric.current)}</td><td><b>${escapeHtml(change.label)}</b></td></tr>`;
+  }).join('');
+
+  const timingGroups = new Map();
+  const timingDays = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ nhật'];
+  source.forEach(post => {
+    const slot = heatmapSlot(post.post_time);
+    const day = heatmapDayIndex(post.post_date);
+    if(slot === null || day === null) return;
+    const key = `${slot}|${day}`;
+    if(!timingGroups.has(key)) timingGroups.set(key, []);
+    timingGroups.get(key).push(post);
+  });
+  const timingRows = Array.from(timingGroups.entries()).map(([key,items]) => {
+    const [slot,day] = key.split('|').map(Number);
+    const totalReach = items.reduce((sum,post) => sum + heatmapMetricValue(post,'Số người tiếp cận'),0);
+    return { slot, day, posts:items.length, average:totalReach/Math.max(items.length,1) };
+  }).sort((a,b) => b.average-a.average).slice(0,10)
+    .map((row,index) => `<tr><td><span class="rank">${index+1}</span></td><td>${timingDays[row.day]}</td><td>${String(row.slot).padStart(2,'0')}:00</td><td>${formatMetricNumber(row.average)}</td><td>${row.posts}</td></tr>`).join('');
+
+  const contentType = post => {
+    const media = getMediaUrls(post);
+    if(media.some(url => /\.(mp4|mov|avi|webm)(\?|$)/i.test(url))) return 'Video';
+    if(getImageUrls(post).length || media.some(url => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url))) return 'Hình ảnh';
+    if(post.post_link) return 'Liên kết';
+    return 'Văn bản';
+  };
+  const contentRows = ['Video','Hình ảnh','Liên kết','Văn bản'].map(type => {
+    const items = source.filter(post => contentType(post) === type);
+    const reach = sumMetricAliases(items,['Số người tiếp cận','Reach']);
+    const engagement = totalEngagementForPosts(items);
+    return `<tr><td><b>${type}</b></td><td>${items.length}</td><td>${formatMetricNumber(reach)}</td><td>${formatMetricNumber(engagement)}</td><td>${formatMetricNumber(reach/Math.max(items.length,1))}</td></tr>`;
+  }).join('');
+
+  const selectedDate = new Date(`${month}-01T00:00:00`);
+  const trendData = Array.from({length:6},(_,offset) => {
+    const date = new Date(selectedDate.getFullYear(),selectedDate.getMonth()-(5-offset),1);
+    const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+    const items = getAllShowroomReportPosts(key);
+    return { label:`${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`, posts:items.length, reach:sumMetricAliases(items,['Số người tiếp cận','Reach']), engagement:totalEngagementForPosts(items) };
+  });
+  const maxTrendReach = Math.max(...trendData.map(row => row.reach),1);
+  const trendChart = trendData.map(row => `<div class="bar-row"><span>${row.label}</span><div class="bar-track"><i style="width:${row.reach ? Math.max(3,row.reach/maxTrendReach*100) : 0}%;--bar-color:#22d3ee"></i></div><b>${formatMetricNumber(row.reach)}</b></div>`).join('');
+  const trendRows = trendData.map(row => `<tr><td>${row.label}</td><td>${row.posts}</td><td>${formatMetricNumber(row.reach)}</td><td>${formatMetricNumber(row.engagement)}</td></tr>`).join('');
+
+  const statusMap = source.reduce((acc,post) => {
+    const status = post.status || 'Chưa xác định';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  },{});
+  const statusRows = Object.entries(statusMap).sort((a,b) => b[1]-a[1]).map(([status,count]) => `<tr><td><b>${escapeHtml(status)}</b></td><td>${count}</td><td>${source.length ? (count/source.length*100).toLocaleString('vi-VN',{maximumFractionDigits:1}) : 0}%</td></tr>`).join('');
   const reportWindow = window.open('', '_blank');
   if(!reportWindow){
     alert('Trình duyệt đang chặn cửa sổ báo cáo. Vui lòng cho phép pop-up rồi thử lại.');
@@ -4162,6 +4223,11 @@ function exportPdfReport(){
       ${selectedSections.has('overview') ? `<section class="section"><div class="section-head"><div><h2>Executive Overview</h2><p>Tổng hợp hiệu quả theo đơn vị và cơ cấu nền tảng</p></div><span class="section-tag">Power BI View</span></div><div class="dashboard-grid"><div class="chart-card"><h3>Reach theo đơn vị</h3>${unitChart}</div><div class="chart-card"><h3>Engagement theo nền tảng</h3>${platformChart}</div></div></section>` : ''}
       ${selectedSections.has('showrooms') ? `<section class="section"><div class="section-head"><div><h2>Showroom Performance</h2><p>So sánh chi tiết theo đơn vị</p></div><span class="section-tag">${units.length} đơn vị</span></div><table><thead><tr><th>Đơn vị</th><th>Reach</th><th>Engagement</th><th>Bài đăng</th></tr></thead><tbody>${unitRows}</tbody></table></section>` : ''}
       ${selectedSections.has('platforms') ? `<section class="section"><div class="section-head"><div><h2>Platform Performance</h2><p>Hiệu quả theo kênh truyền thông</p></div><span class="section-tag">Channel mix</span></div><table><thead><tr><th>Nền tảng</th><th>Reach</th><th>Engagement</th><th>Tỷ lệ</th><th>Bài đăng</th></tr></thead><tbody>${platformTable}</tbody></table></section>` : ''}
+      ${selectedSections.has('timing') ? `<section class="section"><div class="section-head"><div><h2>Hiệu quả khung giờ đăng bài</h2><p>Top 10 ngày và giờ có Reach trung bình trên mỗi bài tốt nhất</p></div><span class="section-tag">Timing intelligence</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Khung giờ</th><th>Reach TB/bài</th><th>Số bài</th></tr></thead><tbody>${timingRows || '<tr><td colspan="5">Chưa đủ dữ liệu giờ đăng và Reach.</td></tr>'}</tbody></table></section>` : ''}
+      ${selectedSections.has('content') ? `<section class="section"><div class="section-head"><div><h2>Hiệu quả định dạng nội dung</h2><p>So sánh sản lượng và hiệu quả theo loại nội dung</p></div><span class="section-tag">Content intelligence</span></div><table><thead><tr><th>Loại nội dung</th><th>Số bài</th><th>Reach</th><th>Engagement</th><th>Reach TB/bài</th></tr></thead><tbody>${contentRows}</tbody></table></section>` : ''}
+      ${selectedSections.has('comparison') ? `<section class="section"><div class="section-head"><div><h2>So sánh với tháng trước</h2><p>${periodLabel} so với tháng ${Number(previousMonth.slice(5,7))}/${previousMonth.slice(0,4)}</p></div><span class="section-tag">Month over month</span></div><table><thead><tr><th>Chỉ tiêu</th><th>Tháng trước</th><th>Tháng này</th><th>Biến động</th></tr></thead><tbody>${comparisonRows}</tbody></table></section>` : ''}
+      ${selectedSections.has('trends') ? `<section class="section"><div class="section-head"><div><h2>Xu hướng 6 tháng</h2><p>Diễn biến Reach, Engagement và sản lượng nội dung</p></div><span class="section-tag">Monthly trends</span></div><div class="dashboard-grid"><div class="chart-card"><h3>Reach theo tháng</h3>${trendChart}</div><div class="chart-card"><table><thead><tr><th>Tháng</th><th>Bài</th><th>Reach</th><th>Engagement</th></tr></thead><tbody>${trendRows}</tbody></table></div></div></section>` : ''}
+      ${selectedSections.has('status') ? `<section class="section"><div class="section-head"><div><h2>Tiến độ nội dung</h2><p>Phân bổ bài đăng theo trạng thái xử lý</p></div><span class="section-tag">Workflow</span></div><table><thead><tr><th>Trạng thái</th><th>Số bài</th><th>Tỷ trọng</th></tr></thead><tbody>${statusRows}</tbody></table></section>` : ''}
       ${selectedSections.has('topPosts') ? `<section class="section"><div class="section-head"><div><h2>Top Performing Posts</h2><p>5 bài đăng nổi bật nhất trong kỳ</p></div><span class="section-tag">Top 5</span></div><table><thead><tr><th>#</th><th>Tiêu đề</th><th>Nền tảng</th><th>Showroom</th><th>Hiệu quả</th></tr></thead><tbody>${topRows}</tbody></table></section>` : ''}
       ${selectedSections.has('details') ? `<section class="section page-break"><div class="section-head"><div><h2>Post Details</h2><p>Danh sách bài đăng thuộc kỳ báo cáo</p></div><span class="section-tag">${source.length} bài</span></div><table><thead><tr><th>#</th><th>Ngày</th><th>Nền tảng</th><th>Showroom</th><th>Tiêu đề</th></tr></thead><tbody>${postRows}</tbody></table></section>` : ''}
       <p class="note">Báo cáo được tổng hợp từ dữ liệu hiện có của 6 đơn vị trong tháng được chọn. Danh sách chi tiết hiển thị tối đa 100 bài; dùng Xuất Excel để lấy toàn bộ dữ liệu.</p>
