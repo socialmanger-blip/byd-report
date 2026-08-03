@@ -488,29 +488,27 @@
       <div class="modal-head">
         <div>
           <h3>Xuất báo cáo Power BI</h3>
-          <small>Chọn tháng và các phần cần đưa vào báo cáo</small>
+          <small>Xuất đúng giao diện dashboard sang PDF hoặc PowerPoint</small>
         </div>
         <button class="icon" id="btnClosePdfExport">×</button>
       </div>
       <label>Tháng báo cáo</label>
       <input id="pdfReportMonth" type="month" />
-      <label>Các mục cần báo cáo</label>
-      <div class="export-fields pdf-report-sections">
-        <label><input type="checkbox" value="summary" checked><span><b>Tổng quan điều hành</b><small>KPI tổng Reach, Engagement, bài đăng và Followers</small></span></label>
-        <label><input type="checkbox" value="overview" checked><span><b>Biểu đồ tổng quan</b><small>So sánh hiệu quả giữa đơn vị và nền tảng</small></span></label>
-        <label><input type="checkbox" value="showrooms" checked><span><b>Hiệu quả showroom</b><small>Bảng đối chiếu Trụ sở chính và 5 showroom</small></span></label>
-        <label><input type="checkbox" value="platforms" checked><span><b>Hiệu quả nền tảng</b><small>Facebook, TikTok, Zalo OA, YouTube và Google Maps</small></span></label>
-        <label><input type="checkbox" value="timing" checked><span><b>Hiệu quả khung giờ</b><small>Ngày và giờ đăng có Reach trung bình tốt nhất</small></span></label>
-        <label><input type="checkbox" value="content" checked><span><b>Hiệu quả nội dung</b><small>So sánh ảnh, video, liên kết và bài viết văn bản</small></span></label>
-        <label><input type="checkbox" value="comparison" checked><span><b>So với tháng trước</b><small>Biến động bài đăng, Reach, Engagement, lượt xem và click</small></span></label>
-        <label><input type="checkbox" value="trends"><span><b>Xu hướng 6 tháng</b><small>Diễn biến Reach, Engagement và sản lượng nội dung</small></span></label>
-        <label><input type="checkbox" value="status"><span><b>Tiến độ nội dung</b><small>Phân bổ bài đã đăng, chờ duyệt và ý tưởng</small></span></label>
-        <label><input type="checkbox" value="topPosts" checked><span><b>Top bài đăng</b><small>Các nội dung hiệu quả nhất trong tháng</small></span></label>
-        <label><input type="checkbox" value="details"><span><b>Danh sách chi tiết</b><small>Tối đa 100 bài đăng trong kỳ báo cáo</small></span></label>
+      <label>Định dạng file</label>
+      <select id="dashboardExportFormat">
+        <option value="pdf">PDF báo cáo</option>
+        <option value="pptx">PowerPoint (.pptx)</option>
+      </select>
+      <label>Các trang dashboard cần xuất</label>
+      <div class="export-fields pdf-report-sections dashboard-export-views">
+        <label><input type="checkbox" value="overview" checked><span><b>Overview</b><small>KPI, khung giờ, hiệu quả nội dung và tổng quan hệ thống</small></span></label>
+        <label><input type="checkbox" value="platform" checked><span><b>Platform Performance</b><small>So sánh hiệu quả giữa các nền tảng</small></span></label>
+        <label><input type="checkbox" value="showroom" checked><span><b>Showroom Analysis</b><small>So sánh Trụ sở chính và 5 showroom</small></span></label>
+        <label><input type="checkbox" value="monthly" checked><span><b>Monthly Trends</b><small>So sánh tháng trước và xu hướng theo thời gian</small></span></label>
       </div>
       <div class="modal-actions">
         <button id="btnCancelPdfExport">Hủy</button>
-        <button class="primary" id="btnGeneratePdf">Tạo báo cáo PDF</button>
+        <button class="primary" id="btnGeneratePdf">Xuất dashboard</button>
       </div>
     </div>
   </div>
@@ -588,8 +586,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260803-34"></script>
+  <script src="app.js?v=20260803-35"></script>
 </body>
 </html>

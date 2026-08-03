@@ -226,7 +226,7 @@ function bindEvents(){
   bindClick('btnExportPdf', openPdfExportModal);
   bindClick('btnClosePdfExport', closePdfExportModal);
   bindClick('btnCancelPdfExport', closePdfExportModal);
-  bindClick('btnGeneratePdf', exportPdfReport);
+  bindClick('btnGeneratePdf', exportDashboardReport);
   bindClick('btnOpenMetaImport', openMetaImportModal);
   bindClick('btnCloseMetaImport', closeMetaImportModal);
   bindClick('btnCancelMetaImport', closeMetaImportModal);
@@ -4068,6 +4068,105 @@ function closePdfExportModal(){
 
 function getPdfSelectedSections(){
   return new Set(Array.from(document.querySelectorAll('.pdf-report-sections input:checked')).map(input => input.value));
+}
+
+function nextDashboardPaint(){
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+async function exportDashboardReport(){
+  const month = $('pdfReportMonth').value;
+  const format = $('dashboardExportFormat').value;
+  const views = Array.from(document.querySelectorAll('.dashboard-export-views input:checked')).map(input => input.value);
+  if(!month){ alert('Vui lòng chọn tháng báo cáo.'); return; }
+  if(!views.length){ alert('Vui lòng chọn ít nhất một trang dashboard.'); return; }
+  if(typeof html2canvas !== 'function'){
+    alert('Chưa tải được công cụ dựng dashboard. Vui lòng kiểm tra mạng và tải lại trang.');
+    return;
+  }
+  if(format === 'pdf' && !window.jspdf){ alert('Chưa tải được công cụ tạo PDF.'); return; }
+  if(format === 'pptx' && typeof PptxGenJS === 'undefined'){ alert('Chưa tải được công cụ tạo PowerPoint.'); return; }
+
+  const button = $('btnGeneratePdf');
+  const previousText = button.innerText;
+  const previousView = currentBiView;
+  const previousMonth = $('monthFilter').value;
+  try{
+    button.disabled = true;
+    $('monthFilter').value = month;
+    periodPickerDisplayYear = Number(month.slice(0,4));
+    renderPeriodPicker();
+    renderPosts();
+    updateStats();
+    await nextDashboardPaint();
+
+    const dashboard = document.querySelector('.bi-dashboard');
+    const captures = [];
+    const viewLabels = { overview:'Overview', platform:'Platform Performance', showroom:'Showroom Analysis', monthly:'Monthly Trends' };
+    for(let index=0; index<views.length; index++){
+      button.innerText = `Đang dựng ${index+1}/${views.length}...`;
+      setBiView(views[index]);
+      updateStats();
+      await nextDashboardPaint();
+      const canvas = await html2canvas(dashboard, {
+        scale:1.5,
+        backgroundColor:'#07111f',
+        useCORS:true,
+        logging:false,
+        windowWidth:Math.max(1500, dashboard.scrollWidth)
+      });
+      captures.push({ view:views[index], label:viewLabels[views[index]], canvas, data:canvas.toDataURL('image/png',1) });
+    }
+
+    const fileBase = `SocialHub-PowerBI-${month}`;
+    if(format === 'pdf'){
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a3', compress:true });
+      captures.forEach((capture,index) => {
+        if(index) pdf.addPage('a3','landscape');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.setFillColor(7,17,31);
+        pdf.rect(0,0,pageWidth,pageHeight,'F');
+        const margin = 7;
+        const ratio = Math.min((pageWidth-margin*2)/capture.canvas.width,(pageHeight-margin*2)/capture.canvas.height);
+        const width = capture.canvas.width*ratio;
+        const height = capture.canvas.height*ratio;
+        pdf.addImage(capture.data,'PNG',(pageWidth-width)/2,(pageHeight-height)/2,width,height,undefined,'FAST');
+      });
+      pdf.save(`${fileBase}.pdf`);
+    }else{
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE';
+      pptx.author = 'SocialHub BYD NEG';
+      pptx.subject = `Dashboard tháng ${month}`;
+      pptx.title = `Social Media Performance Dashboard ${month}`;
+      captures.forEach(capture => {
+        const slide = pptx.addSlide();
+        slide.background = { color:'07111F' };
+        const maxWidth = 13.05;
+        const maxHeight = 7.22;
+        const ratio = Math.min(maxWidth/capture.canvas.width,maxHeight/capture.canvas.height);
+        const width = capture.canvas.width*ratio;
+        const height = capture.canvas.height*ratio;
+        slide.addImage({ data:capture.data, x:(13.333-width)/2, y:(7.5-height)/2, w:width, h:height });
+      });
+      await pptx.writeFile({ fileName:`${fileBase}.pptx` });
+    }
+    closePdfExportModal();
+  }catch(err){
+    console.error('Không thể xuất dashboard:',err);
+    alert('Không thể xuất dashboard: ' + err.message);
+  }finally{
+    setBiView(previousView);
+    if(previousMonth && previousMonth !== month){
+      $('monthFilter').value = previousMonth;
+      renderPosts();
+      updateStats();
+    }
+    button.disabled = false;
+    button.innerText = previousText;
+  }
 }
 
 function exportPdfReport(){
