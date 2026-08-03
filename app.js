@@ -2294,14 +2294,15 @@ async function saveMediaFolderToSupabase(folder){
     .limit(1);
   if(selectError) throw selectError;
   if(data && data.length) return;
-  const { error } = await supabaseClient.from('media_library').insert({
+  const { data:created, error } = await supabaseClient.from('media_library').insert({
     name: '.folder',
     folder,
     url: '#folder',
     type: 'folder',
     size: 0
-  });
+  }).select('id,folder').single();
   if(error) throw error;
+  if(!created || created.folder !== folder) throw new Error('Supabase không xác nhận thư mục vừa tạo.');
 }
 
 async function updateMediaFolderInSupabase(folder, nextFolder){
@@ -2631,6 +2632,7 @@ async function uploadFileToMediaLibrary(file, folder){
   };
   mediaLibrary.files.unshift(item);
   saveMediaLibrary();
+  await saveMediaLibraryBackupToStorage();
   return item;
 }
 
@@ -2663,6 +2665,7 @@ async function createMediaFolder(parentFolder = ''){
     if(baseFolder) expandedMediaFolders.add(baseFolder);
     expandFolderAncestors(folder);
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     renderMediaLibrary();
   }catch(err){
     alert('Không tạo được thư mục trên Supabase: ' + err.message);
@@ -2692,6 +2695,7 @@ async function renameMediaFolder(folder){
       currentMediaFolder = `${nextFolder}${currentMediaFolder.slice(folder.length)}`;
     }
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     renderMediaLibrary();
   }catch(err){
     alert('Không đổi được tên thư mục trên Supabase: ' + err.message);
@@ -2711,6 +2715,7 @@ async function deleteMediaFolder(folder){
     mediaLibrary.files = mediaLibrary.files.filter(file => !belongsToFolder(file.folder));
     if(belongsToFolder(currentMediaFolder)) currentMediaFolder = 'all';
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     renderMediaLibrary();
   }catch(err){
     alert('Không xóa được thư mục trên Supabase: ' + err.message);
@@ -2727,6 +2732,7 @@ async function renameMediaFile(id){
   try{
     await updateMediaFileInSupabase(id, { name: file.name });
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     renderMediaLibrary();
   }catch(err){
     file.name = previousName;
@@ -2759,6 +2765,7 @@ async function confirmMoveMediaFile(){
   try{
     await updateMediaFileInSupabase(movingMediaFileId, { folder: file.folder });
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     closeMoveMediaModal();
     renderMediaLibrary();
   }catch(err){
@@ -2776,6 +2783,7 @@ async function deleteMediaFile(id){
     await deleteMediaFileFromSupabase(id);
     mediaLibrary.files = mediaLibrary.files.filter(file => file.id !== id);
     saveMediaLibrary();
+    await saveMediaLibraryBackupToStorage();
     renderMediaLibrary();
   }catch(err){
     mediaLibrary.files = previousFiles;
