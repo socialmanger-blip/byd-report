@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260803-28" />
+  <link rel="stylesheet" href="style.css?v=20260803-33" />
 </head>
 <body>
   <section class="auth-screen" id="authScreen">
@@ -483,6 +483,33 @@
     </div>
   </div>
 
+  <div class="modal" id="pdfExportModal">
+    <div class="modal-box export-box pdf-report-box">
+      <div class="modal-head">
+        <div>
+          <h3>Xuất báo cáo Power BI</h3>
+          <small>Chọn tháng và các phần cần đưa vào báo cáo</small>
+        </div>
+        <button class="icon" id="btnClosePdfExport">×</button>
+      </div>
+      <label>Tháng báo cáo</label>
+      <input id="pdfReportMonth" type="month" />
+      <label>Các mục cần báo cáo</label>
+      <div class="export-fields pdf-report-sections">
+        <label><input type="checkbox" value="summary" checked><span><b>Tổng quan điều hành</b><small>KPI tổng Reach, Engagement, bài đăng và Followers</small></span></label>
+        <label><input type="checkbox" value="overview" checked><span><b>Biểu đồ tổng quan</b><small>So sánh hiệu quả giữa đơn vị và nền tảng</small></span></label>
+        <label><input type="checkbox" value="showrooms" checked><span><b>Hiệu quả showroom</b><small>Bảng đối chiếu Trụ sở chính và 5 showroom</small></span></label>
+        <label><input type="checkbox" value="platforms" checked><span><b>Hiệu quả nền tảng</b><small>Facebook, TikTok, Zalo OA, YouTube và Google Maps</small></span></label>
+        <label><input type="checkbox" value="topPosts" checked><span><b>Top bài đăng</b><small>Các nội dung hiệu quả nhất trong tháng</small></span></label>
+        <label><input type="checkbox" value="details"><span><b>Danh sách chi tiết</b><small>Tối đa 100 bài đăng trong kỳ báo cáo</small></span></label>
+      </div>
+      <div class="modal-actions">
+        <button id="btnCancelPdfExport">Hủy</button>
+        <button class="primary" id="btnGeneratePdf">Tạo báo cáo PDF</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="metaImportModal">
     <div class="modal-box export-box meta-import-box">
       <div class="modal-head">
@@ -558,6 +585,6 @@
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260730-12"></script>
-  <script src="app.js?v=20260803-32"></script>
+  <script src="app.js?v=20260803-33"></script>
 </body>
 </html>

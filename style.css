@@ -1894,6 +1894,25 @@ tbody tr:hover {
   background: #f8fafc;
 }
 
+.pdf-report-box { width: min(760px, 94vw); }
+.pdf-report-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pdf-report-sections > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(96,165,250,.2);
+  border-radius: 10px;
+  background: rgba(9,24,43,.72);
+  cursor: pointer;
+}
+.pdf-report-sections input { width: auto; margin-top: 3px; accent-color: #22d3ee; }
+.pdf-report-sections span { display: grid; gap: 3px; }
+.pdf-report-sections b { color: #f8fcff; }
+.pdf-report-sections small { color: #94a3b8; line-height: 1.35; }
+@media (max-width: 640px){ .pdf-report-sections { grid-template-columns: 1fr; } }
+
 .export-field {
   display: flex;
   align-items: center;
